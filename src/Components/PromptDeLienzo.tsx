@@ -22,7 +22,7 @@ function Prompteador({
 
   return (
     <div
-      className={`bg-sky-500 text-amber-50 mx-auto w-64 text-center p-14 border-sky-800 border-6 transition-all duration-3500 ease-in-out ${
+      className={`bg-sky-500 text-amber-50 mx-auto w-64 text-center p-14 rounded-[20px] border-sky-800 border-6 transition-all duration-3500 ease-in-out ${
         mostrarPrompt ? "" : "translate-y-[200vh]"
       }`}
     >

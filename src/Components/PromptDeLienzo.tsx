@@ -1,5 +1,8 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { LienzoContext } from "./ContextDeLienzo";
+
+const MIN_DIMENSION = 16;
+const MAX_DIMENSION = 4096;
 
 interface Propiedades {
   PromptText?: string;
@@ -13,9 +16,33 @@ function Prompteador({
   setMostrarPrompt,
 }: Propiedades) {
   const { ancho, alto, setAncho, setAlto } = useContext(LienzoContext);
+  const [errorAncho, setErrorAncho] = useState<string | null>(null);
+  const [errorAlto, setErrorAlto] = useState<string | null>(null);
+
+  const validarDimension = (valor: number): string | null => {
+    if (isNaN(valor)) return "Debe ser un número válido";
+    if (valor < MIN_DIMENSION) return `Mínimo ${MIN_DIMENSION}px`;
+    if (valor > MAX_DIMENSION) return `Máximo ${MAX_DIMENSION}px`;
+    return null;
+  };
+
+  const handleAnchoChange = (value: number) => {
+    setAncho(value);
+    setErrorAncho(validarDimension(value));
+  };
+
+  const handleAltoChange = (value: number) => {
+    setAlto(value);
+    setErrorAlto(validarDimension(value));
+  };
 
   const handleCrear = () => {
-    if (setMostrarPrompt) {
+    const errorA = validarDimension(ancho);
+    const errorAL = validarDimension(alto);
+    setErrorAncho(errorA);
+    setErrorAlto(errorAL);
+
+    if (!errorA && !errorAL && setMostrarPrompt) {
       setMostrarPrompt(false);
     }
   };
@@ -32,22 +59,26 @@ function Prompteador({
           Ancho:
           <input
             type="number"
+            min={0}
             value={ancho}
-            onChange={(e) => setAncho(Number(e.target.value))}
+            onChange={(e) => handleAnchoChange(Number(e.target.value))}
             onFocus={(e) => e.target.select()}
             className="ml-2 text-black rounded px-1 w-20 bg-white"
           />
         </label>
+        {errorAncho && <span className="text-red-200 text-xs">{errorAncho}</span>}
         <label className="text-sm">
           Alto:
           <input
             type="number"
+            min={0}
             value={alto}
-            onChange={(e) => setAlto(Number(e.target.value))}
+            onChange={(e) => handleAltoChange(Number(e.target.value))}
             onFocus={(e) => e.target.select()}
             className="ml-2 text-black rounded px-1 w-20 bg-white"
           />
         </label>
+        {errorAlto && <span className="text-red-200 text-xs">{errorAlto}</span>}
       </div>
       <button
         onClick={handleCrear}

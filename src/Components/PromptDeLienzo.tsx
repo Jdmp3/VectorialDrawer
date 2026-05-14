@@ -1,6 +1,8 @@
 import { useContext } from "react";
 import { LienzoContext } from "./ContextDeLienzo";
 
+const TAMANOS = [16, 32, 64, 128, 200, 256];
+
 interface Propiedades {
   PromptText?: string;
   mostrarPrompt?: boolean;
@@ -12,7 +14,7 @@ function Prompteador({
   mostrarPrompt = true,
   setMostrarPrompt,
 }: Propiedades) {
-  const { ancho, alto, setAncho, setAlto } = useContext(LienzoContext);
+  const { tamano, setTamano } = useContext(LienzoContext);
 
   const handleCrear = () => {
     if (setMostrarPrompt) {
@@ -26,32 +28,31 @@ function Prompteador({
         mostrarPrompt ? "" : "translate-y-[200vh]"
       }`}
     >
-      {PromptText}
-      <div className="mt-2 flex flex-col gap-2">
-        <label className="text-sm">
-          Ancho:
-          <input
-            type="number"
-            value={ancho}
-            onChange={(e) => setAncho(Number(e.target.value))}
-            onFocus={(e) => e.target.select()}
-            className="ml-2 text-black rounded px-1 w-20 bg-white"
-          />
-        </label>
-        <label className="text-sm">
-          Alto:
-          <input
-            type="number"
-            value={alto}
-            onChange={(e) => setAlto(Number(e.target.value))}
-            onFocus={(e) => e.target.select()}
-            className="ml-2 text-black rounded px-1 w-20 bg-white"
-          />
-        </label>
+      <div className="text-lg font-semibold mb-4">{PromptText}</div>
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        {TAMANOS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTamano(t)}
+            className={`p-2 rounded text-sm font-medium transition-colors ${
+              tamano === t
+                ? "bg-sky-700 border-2 border-amber-50 text-amber-50"
+                : "bg-sky-600 hover:bg-sky-800 text-white"
+            }`}
+          >
+            {t}x{t}
+          </button>
+        ))}
+      </div>
+      <div className="text-sm mb-4">
+        Tamaño seleccionado:{" "}
+        <span className="font-bold">
+          {tamano}x{tamano}
+        </span>
       </div>
       <button
         onClick={handleCrear}
-        className="mt-4 bg-sky-700 hover:bg-sky-800 text-white px-4 py-2 rounded"
+        className="bg-sky-700 hover:bg-sky-800 text-white px-6 py-2 rounded font-medium"
       >
         Crear
       </button>

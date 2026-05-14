@@ -1,15 +1,17 @@
 import { createContext } from "react";
 
 interface LienzoContextType {
-  ancho: number;
-  alto: number;
-  setAncho: (value: number) => void;
-  setAlto: (value: number) => void;
+  tamano: number;
+  setTamano: (value: number) => void;
+  mostrarPrompt: boolean;
+  offset: { x: number; y: number };
+  setOffset: (offset: { x: number; y: number }) => void;
 }
 
 export const LienzoContext = createContext<LienzoContextType>({
-  ancho: 400,
-  alto: 800,
-  setAncho: () => {},
-  setAlto: () => {},
+  tamano: 16,
+  setTamano: () => {},
+  mostrarPrompt: true,
+  offset: { x: 0, y: 0 },
+  setOffset: () => {},
 });

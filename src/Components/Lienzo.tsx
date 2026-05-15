@@ -55,12 +55,15 @@ function Lienzo() {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-gray-800">
+    <div
+      className="fixed inset-0 flex items-center justify-center bg-zinc-800"
+      role="presentation"
+    >
       <svg
         width={TAMANO_VISUAL}
         height={TAMANO_VISUAL}
         viewBox={`${offset.x} ${offset.y} ${viewBoxSize} ${viewBoxSize}`}
-        className={`bg-gray-600 shadow-2xl transition-opacity duration-500 ${
+        className={`bg-zinc-600 shadow-2xl transition-opacity duration-500 ${
           mostrarPrompt ? "opacity-0" : "opacity-100"
         }`}
         style={{

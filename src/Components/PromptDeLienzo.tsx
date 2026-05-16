@@ -24,7 +24,7 @@ function Prompteador({
 
   return (
     <div
-      className={`bg-sky-500 text-amber-50 mx-auto w-64 text-center p-14 rounded-[20px] border-sky-800 border-6 transition-all duration-3500 ease-in-out ${
+      className={`bg-sky-500 text-amber-50 mx-auto w-full max-w-md text-center p-6 sm:p-14 rounded-[20px] border-sky-800 border-6 transition-all duration-3500 ease-in-out z-50 ${
         mostrarPrompt ? "" : "translate-y-[200vh]"
       }`}
     >
@@ -34,7 +34,7 @@ function Prompteador({
           <button
             key={t}
             onClick={() => setTamano(t)}
-            className={`p-2 rounded text-sm font-medium transition-colors ${
+            className={`p-3 rounded text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${
               tamano === t
                 ? "bg-sky-700 border-2 border-amber-50 text-amber-50"
                 : "bg-sky-600 hover:bg-sky-800 text-white"

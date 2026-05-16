@@ -10,7 +10,9 @@ function App() {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
   return (
-    <LienzoContext.Provider value={{ tamano, setTamano, mostrarPrompt, offset, setOffset }}>
+    <LienzoContext.Provider
+      value={{ tamano, setTamano, mostrarPrompt, offset, setOffset }}
+    >
       <section className="min-h-screen flex justify-center items-center w-full bg-gray-700 overflow-hidden h-screen">
         <Lienzo />
         <Prompteador

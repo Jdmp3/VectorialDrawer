@@ -55,10 +55,7 @@ function Lienzo() {
   };
 
   return (
-    <div
-      className="fixed inset-0 flex items-center justify-center bg-zinc-800"
-      role="presentation"
-    >
+    <div className="fixed inset-0 flex items-center justify-center bg-zinc-800">
       <svg
         width={TAMANO_VISUAL}
         height={TAMANO_VISUAL}

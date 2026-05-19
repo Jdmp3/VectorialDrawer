@@ -4,7 +4,7 @@ import { LienzoContext } from "./ContextDeLienzo";
 const TAMANO_VISUAL = 1024;
 
 function Lienzo() {
-  const { tamano, mostrarPrompt, offset, setOffset, zoom } =
+  const { tamano, mostrarPrompt, offset, setOffset, zoom, grosorBorde } =
     useContext(LienzoContext);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -25,7 +25,6 @@ function Lienzo() {
     ? { x: 0, y: 0 }
     : offset;
   const maxOffset = tamano - viewBoxSize;
-  const strokeWidth = Math.max(0.5, 1 / tamano);
 
   const clamp = (value: number, min: number, max: number) =>
     Math.max(min, Math.min(max, value));
@@ -79,7 +78,7 @@ function Lienzo() {
               d="M 1 0 L 0 0 0 1"
               fill="none"
               stroke="gray"
-              strokeWidth={strokeWidth}
+              strokeWidth={grosorBorde}
             />
           </pattern>
         </defs>
@@ -90,7 +89,7 @@ function Lienzo() {
           x2={tamano}
           y2={tamano}
           stroke="gray"
-          strokeWidth={0.3}
+          strokeWidth={grosorBorde}
         />
         <line
           x1={0}
@@ -98,7 +97,7 @@ function Lienzo() {
           x2={tamano}
           y2={tamano}
           stroke="gray"
-          strokeWidth={0.3}
+          strokeWidth={grosorBorde}
         />
       </svg>
     </div>

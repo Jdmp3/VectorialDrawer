@@ -6,6 +6,8 @@ interface LienzoContextType {
   mostrarPrompt: boolean;
   offset: { x: number; y: number };
   setOffset: (offset: { x: number; y: number }) => void;
+  zoom: number;
+  setZoom: (zoom: number) => void;
 }
 
 export const LienzoContext = createContext<LienzoContextType>({
@@ -14,4 +16,6 @@ export const LienzoContext = createContext<LienzoContextType>({
   mostrarPrompt: true,
   offset: { x: 0, y: 0 },
   setOffset: () => {},
+  zoom: 1,
+  setZoom: () => {},
 });

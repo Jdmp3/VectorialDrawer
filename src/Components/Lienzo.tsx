@@ -1,37 +1,37 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { LienzoContext } from "./ContextDeLienzo";
 
 const TAMANO_VISUAL = 1024;
 
 function Lienzo() {
-  const { tamano, mostrarPrompt, offset, setOffset } =
+  const { tamano, mostrarPrompt, offset, setOffset, zoom } =
     useContext(LienzoContext);
-  const [zoom, setZoom] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+  useEffect(() => {
+    const viewBoxSize = tamano / zoom;
+    const maxOffset = tamano - viewBoxSize;
+    const clampedX = Math.min(offset.x, Math.max(0, maxOffset));
+    const clampedY = Math.min(offset.y, Math.max(0, maxOffset));
+    if (clampedX !== offset.x || clampedY !== offset.y) {
+      setOffset({ x: clampedX, y: clampedY });
+    }
+  }, [zoom, tamano, offset.x, offset.y, setOffset]);
+
   const viewBoxSize = tamano / zoom;
+  const isZoomedOut = viewBoxSize > tamano;
+  const centeredOffset = isZoomedOut 
+    ? { x: 0, y: 0 }
+    : offset;
   const maxOffset = tamano - viewBoxSize;
   const strokeWidth = Math.max(0.5, 1 / tamano);
 
   const clamp = (value: number, min: number, max: number) =>
     Math.max(min, Math.min(max, value));
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    const newZoom = Math.max(1, Math.min(8, zoom + delta));
-    const newViewBoxSize = tamano / newZoom;
-    const newMaxOffset = tamano - newViewBoxSize;
-    setZoom(newZoom);
-    setOffset({
-      x: clamp(offset.x, 0, newMaxOffset),
-      y: clamp(offset.y, 0, newMaxOffset),
-    });
-  };
-
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!e.ctrlKey) return;
+    if (!e.ctrlKey || isZoomedOut) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY });
   };
@@ -59,7 +59,7 @@ function Lienzo() {
       <svg
         width={TAMANO_VISUAL}
         height={TAMANO_VISUAL}
-        viewBox={`${offset.x} ${offset.y} ${viewBoxSize} ${viewBoxSize}`}
+        viewBox={`${centeredOffset.x} ${centeredOffset.y} ${viewBoxSize} ${viewBoxSize}`}
         className={`bg-zinc-600 shadow-2xl transition-opacity duration-500 ${
           mostrarPrompt ? "opacity-0" : "opacity-100"
         }`}
@@ -68,7 +68,6 @@ function Lienzo() {
           maxHeight: "100%",
           cursor: isDragging ? "grabbing" : "default",
         }}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

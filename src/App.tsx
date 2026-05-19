@@ -12,11 +12,23 @@ function App() {
   const [mostrarPrompt, setMostrarPrompt] = useState(true);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [grosorBorde, setGrosorBorde] = useState(0.3);
+  const [grosorBorde, setGrosorBorde] = useState(0.1);
 
   return (
     <LienzoContext.Provider
-      value={{ tamano, setTamano, colorLienzo, setColorLienzo, mostrarPrompt, offset, setOffset, zoom, setZoom, grosorBorde, setGrosorBorde }}
+      value={{
+        tamano,
+        setTamano,
+        colorLienzo,
+        setColorLienzo,
+        mostrarPrompt,
+        offset,
+        setOffset,
+        zoom,
+        setZoom,
+        grosorBorde,
+        setGrosorBorde,
+      }}
     >
       <section className="w-full h-screen bg-gray-700 overflow-hidden">
         <Lienzo />

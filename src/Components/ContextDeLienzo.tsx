@@ -24,6 +24,6 @@ export const LienzoContext = createContext<LienzoContextType>({
   setOffset: () => {},
   zoom: 1,
   setZoom: () => {},
-  grosorBorde: 0.3,
+  grosorBorde: 0.1,
   setGrosorBorde: () => {},
 });

@@ -1,7 +1,7 @@
 import { useContext, useState, useEffect } from "react";
 import { LienzoContext } from "./ContextDeLienzo";
 
-const GROSORES = [0.3, 0.4, 0.1];
+const GROSORES = [0.3, 0.4, 0, 0.1];
 
 export default function BotonGrosor() {
   const { grosorBorde, setGrosorBorde, mostrarPrompt } =
@@ -32,7 +32,7 @@ export default function BotonGrosor() {
         onClick={handleToggle}
         className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
       >
-        Grosor
+        Toggle
       </button>
       <span className="text-white text-lg font-bold">{grosorBorde}</span>
     </div>

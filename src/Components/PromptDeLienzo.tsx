@@ -14,7 +14,7 @@ function Prompteador({
   mostrarPrompt = true,
   setMostrarPrompt,
 }: Propiedades) {
-  const { tamano, setTamano } = useContext(LienzoContext);
+  const { tamano, setTamano, colorLienzo, setColorLienzo } = useContext(LienzoContext);
 
   const handleCrear = () => {
     if (setMostrarPrompt) {
@@ -49,6 +49,17 @@ function Prompteador({
         <span className="font-bold">
           {tamano}x{tamano}
         </span>
+      </div>
+      <div className="mb-4">
+        <label className="text-sm text-amber-50 block mb-2">Color del lienzo:</label>
+        <div className="bg-sky-600 hover:bg-sky-800 text-white p-3 rounded text-sm font-medium cursor-pointer inline-block">
+          <input
+            type="color"
+            value={colorLienzo}
+            onChange={(e) => setColorLienzo(e.target.value)}
+            className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent"
+          />
+        </div>
       </div>
       <button
         onClick={handleCrear}

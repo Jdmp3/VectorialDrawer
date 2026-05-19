@@ -3,6 +3,8 @@ import { createContext } from "react";
 interface LienzoContextType {
   tamano: number;
   setTamano: (value: number) => void;
+  colorLienzo: string;
+  setColorLienzo: (color: string) => void;
   mostrarPrompt: boolean;
   offset: { x: number; y: number };
   setOffset: (offset: { x: number; y: number }) => void;
@@ -15,6 +17,8 @@ interface LienzoContextType {
 export const LienzoContext = createContext<LienzoContextType>({
   tamano: 16,
   setTamano: () => {},
+  colorLienzo: "#3d3d3d",
+  setColorLienzo: () => {},
   mostrarPrompt: true,
   offset: { x: 0, y: 0 },
   setOffset: () => {},

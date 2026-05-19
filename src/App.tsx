@@ -8,6 +8,7 @@ import { LienzoContext } from "./Components/ContextDeLienzo";
 
 function App() {
   const [tamano, setTamano] = useState(16);
+  const [colorLienzo, setColorLienzo] = useState("#3d3d3d");
   const [mostrarPrompt, setMostrarPrompt] = useState(true);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -15,7 +16,7 @@ function App() {
 
   return (
     <LienzoContext.Provider
-      value={{ tamano, setTamano, mostrarPrompt, offset, setOffset, zoom, setZoom, grosorBorde, setGrosorBorde }}
+      value={{ tamano, setTamano, colorLienzo, setColorLienzo, mostrarPrompt, offset, setOffset, zoom, setZoom, grosorBorde, setGrosorBorde }}
     >
       <section className="w-full h-screen bg-gray-700 overflow-hidden">
         <Lienzo />

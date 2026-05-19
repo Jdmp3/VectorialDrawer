@@ -3,6 +3,7 @@ import "./App.css";
 import Prompteador from "./Components/PromptDeLienzo";
 import Lienzo from "./Components/Lienzo";
 import ZoomBar from "./Components/ZoomBar";
+import BotonGrosor from "./Components/BotonGrosor";
 import { LienzoContext } from "./Components/ContextDeLienzo";
 
 function App() {
@@ -10,14 +11,16 @@ function App() {
   const [mostrarPrompt, setMostrarPrompt] = useState(true);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [grosorBorde, setGrosorBorde] = useState(0.3);
 
   return (
     <LienzoContext.Provider
-      value={{ tamano, setTamano, mostrarPrompt, offset, setOffset, zoom, setZoom }}
+      value={{ tamano, setTamano, mostrarPrompt, offset, setOffset, zoom, setZoom, grosorBorde, setGrosorBorde }}
     >
       <section className="w-full h-screen bg-gray-700 overflow-hidden">
         <Lienzo />
         <ZoomBar />
+        <BotonGrosor />
         <Prompteador
           mostrarPrompt={mostrarPrompt}
           setMostrarPrompt={setMostrarPrompt}

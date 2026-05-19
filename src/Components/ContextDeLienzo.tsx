@@ -8,6 +8,8 @@ interface LienzoContextType {
   setOffset: (offset: { x: number; y: number }) => void;
   zoom: number;
   setZoom: (zoom: number) => void;
+  grosorBorde: number;
+  setGrosorBorde: (grosor: number) => void;
 }
 
 export const LienzoContext = createContext<LienzoContextType>({
@@ -18,4 +20,6 @@ export const LienzoContext = createContext<LienzoContextType>({
   setOffset: () => {},
   zoom: 1,
   setZoom: () => {},
+  grosorBorde: 0.3,
+  setGrosorBorde: () => {},
 });

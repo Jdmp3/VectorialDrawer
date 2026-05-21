@@ -1,10 +1,33 @@
 import { createContext } from "react";
 
-export interface Stroke {
-  puntos: { x: number; y: number }[];
+export interface LineaShape {
+  id: string;
+  tipo: "linea";
+  x1: number; y1: number;
+  x2: number; y2: number;
   color: string;
   grosor: number;
 }
+
+export interface RectShape {
+  id: string;
+  tipo: "rectangulo";
+  x: number; y: number;
+  width: number; height: number;
+  color: string;
+  grosor: number;
+}
+
+export interface CircleShape {
+  id: string;
+  tipo: "circulo";
+  cx: number; cy: number;
+  r: number;
+  color: string;
+  grosor: number;
+}
+
+export type VectorElement = LineaShape | RectShape | CircleShape;
 
 interface LienzoContextType {
   tamano: number;
@@ -20,18 +43,21 @@ interface LienzoContextType {
   setZoom: (zoom: number) => void;
   grosorBorde: number;
   setGrosorBorde: (grosor: number) => void;
-  herramientaActual: "lapiz" | "mover";
-  setHerramientaActual: (h: "lapiz" | "mover") => void;
-  colorLapiz: string;
-  setColorLapiz: (color: string) => void;
-  grosorLapiz: number;
-  setGrosorLapiz: (grosor: number) => void;
-  strokes: Stroke[];
-  setStrokes: (strokes: Stroke[]) => void;
-  addStroke: (stroke: Stroke) => void;
-  clearStrokes: () => void;
-  currentStroke: { x: number; y: number }[] | null;
-  setCurrentStroke: (puntos: { x: number; y: number }[] | null) => void;
+  herramientaActual: "figuras" | "mover" | "seleccionar";
+  setHerramientaActual: (h: "figuras" | "mover" | "seleccionar") => void;
+  figuraTipo: "linea" | "rectangulo" | "circulo";
+  setFiguraTipo: (t: "linea" | "rectangulo" | "circulo") => void;
+  colorFigura: string;
+  setColorFigura: (color: string) => void;
+  grosorFigura: number;
+  setGrosorFigura: (grosor: number) => void;
+  elementos: VectorElement[];
+  currentElement: VectorElement | null;
+  setCurrentElement: (el: VectorElement | null) => void;
+  selectedElementId: string | null;
+  setSelectedElementId: (id: string | null) => void;
+  addElemento: (el: VectorElement) => void;
+  clearElementos: () => void;
 }
 
 export const LienzoContext = createContext<LienzoContextType>({
@@ -50,14 +76,17 @@ export const LienzoContext = createContext<LienzoContextType>({
   setGrosorBorde: () => {},
   herramientaActual: "mover",
   setHerramientaActual: () => {},
-  colorLapiz: "#000000",
-  setColorLapiz: () => {},
-  grosorLapiz: 2,
-  setGrosorLapiz: () => {},
-  strokes: [],
-  setStrokes: () => {},
-  addStroke: () => {},
-  clearStrokes: () => {},
-  currentStroke: null,
-  setCurrentStroke: () => {},
+  figuraTipo: "linea",
+  setFiguraTipo: () => {},
+  colorFigura: "#000000",
+  setColorFigura: () => {},
+  grosorFigura: 2,
+  setGrosorFigura: () => {},
+  elementos: [],
+  currentElement: null,
+  setCurrentElement: () => {},
+  selectedElementId: null,
+  setSelectedElementId: () => {},
+  addElemento: () => {},
+  clearElementos: () => {},
 });

@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect, useRef } from "react";
-import { LienzoContext } from "./ContextDeLienzo";
+import { LienzoContext, VectorElement } from "./ContextDeLienzo";
 
 const TAMANO_VISUAL = 1024;
 const FACTOR_LERP = 0.5;
@@ -7,8 +7,8 @@ const FACTOR_LERP = 0.5;
 const lerp = (start: number, end: number, factor: number): number =>
   start + (end - start) * factor;
 
-const puntosToPath = (puntos: { x: number; y: number }[]): string =>
-  puntos.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+let nextId = 1;
+const genId = () => `fig-${nextId++}`;
 
 function Lienzo() {
   const {
@@ -22,17 +22,27 @@ function Lienzo() {
     grosorBorde,
     colorLienzo,
     herramientaActual,
-    strokes,
-    currentStroke,
-    setCurrentStroke,
-    addStroke,
-    colorLapiz,
-    grosorLapiz,
+    figuraTipo,
+    colorFigura,
+    grosorFigura,
+    elementos,
+    addElemento,
+    selectedElementId,
+    setSelectedElementId,
   } = useContext(LienzoContext);
 
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+  const [dragStart, setDragStart] = useState({
+    x: 0,
+    y: 0,
+    offsetX: 0,
+    offsetY: 0,
+  });
   const [isDrawing, setIsDrawing] = useState(false);
+  const [currentLocal, setCurrentLocal] = useState<VectorElement | null>(null);
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -57,7 +67,13 @@ function Lienzo() {
 
     animacionId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animacionId);
-  }, [offsetReal.x, offsetReal.y, offsetRender.x, offsetRender.y, setOffsetRender]);
+  }, [
+    offsetReal.x,
+    offsetReal.y,
+    offsetRender.x,
+    offsetRender.y,
+    setOffsetRender,
+  ]);
 
   const viewBoxSize = tamano / zoom;
   const isZoomedOut = viewBoxSize > tamano;
@@ -66,11 +82,6 @@ function Lienzo() {
 
   const clamp = (value: number, min: number, max: number) =>
     Math.max(min, Math.min(max, value));
-
-  const clampPunto = (p: { x: number; y: number }) => ({
-    x: Math.max(0, Math.min(tamano, p.x)),
-    y: Math.max(0, Math.min(tamano, p.y)),
-  });
 
   const getMousePosition = (e: React.MouseEvent): { x: number; y: number } => {
     if (!svgRef.current) return { x: 0, y: 0 };
@@ -92,11 +103,60 @@ function Lienzo() {
 
     if (herramientaActual === "mover") {
       setIsDragging(true);
-      setDragStart({ x: e.clientX, y: e.clientY, offsetX: offsetReal.x, offsetY: offsetReal.y });
-    } else if (herramientaActual === "lapiz") {
-      const pos = clampPunto(getMousePosition(e));
-      setCurrentStroke([pos]);
+      setDragStart({
+        x: e.clientX,
+        y: e.clientY,
+        offsetX: offsetReal.x,
+        offsetY: offsetReal.y,
+      });
+    } else if (herramientaActual === "figuras") {
+      const pos = getMousePosition(e);
+      const id = genId();
+      let elem: VectorElement;
+      switch (figuraTipo) {
+        case "linea":
+          elem = {
+            id,
+            tipo: "linea",
+            x1: pos.x,
+            y1: pos.y,
+            x2: pos.x,
+            y2: pos.y,
+            color: colorFigura,
+            grosor: grosorFigura,
+          };
+          break;
+        case "rectangulo":
+          elem = {
+            id,
+            tipo: "rectangulo",
+            x: pos.x,
+            y: pos.y,
+            width: 0,
+            height: 0,
+            color: colorFigura,
+            grosor: grosorFigura,
+          };
+          break;
+        case "circulo":
+          elem = {
+            id,
+            tipo: "circulo",
+            cx: pos.x,
+            cy: pos.y,
+            r: 0,
+            color: colorFigura,
+            grosor: grosorFigura,
+          };
+          break;
+      }
+      setCurrentLocal(elem);
+      setDrawStart(pos);
       setIsDrawing(true);
+    } else if (herramientaActual === "seleccionar") {
+      const target = e.target as SVGElement;
+      const id = target.getAttribute("data-element-id");
+      setSelectedElementId(id);
     }
   };
 
@@ -107,32 +167,66 @@ function Lienzo() {
       const newX = clamp(dragStart.offsetX + deltaX, 0, maxOffset);
       const newY = clamp(dragStart.offsetY + deltaY, 0, maxOffset);
       setOffsetReal({ x: newX, y: newY });
-    } else if (isDrawing && herramientaActual === "lapiz" && currentStroke) {
+    } else if (
+      isDrawing &&
+      herramientaActual === "figuras" &&
+      currentLocal &&
+      drawStart
+    ) {
       const pos = getMousePosition(e);
-      if (pos.x >= 0 && pos.x <= tamano && pos.y >= 0 && pos.y <= tamano) {
-        setCurrentStroke([...currentStroke, pos]);
+      switch (currentLocal.tipo) {
+        case "linea":
+          setCurrentLocal({ ...currentLocal, x2: pos.x, y2: pos.y });
+          break;
+        case "rectangulo": {
+          const x = Math.min(drawStart.x, pos.x);
+          const y = Math.min(drawStart.y, pos.y);
+          const w = Math.abs(pos.x - drawStart.x);
+          const h = Math.abs(pos.y - drawStart.y);
+          setCurrentLocal({ ...currentLocal, x, y, width: w, height: h });
+          break;
+        }
+        case "circulo": {
+          const dx = pos.x - drawStart.x;
+          const dy = pos.y - drawStart.y;
+          setCurrentLocal({ ...currentLocal, r: Math.sqrt(dx * dx + dy * dy) });
+          break;
+        }
       }
     }
+  };
+
+  const finalizeDrawing = () => {
+    if (currentLocal) {
+      const valid =
+        (currentLocal.tipo === "linea" &&
+          (currentLocal.x1 !== currentLocal.x2 ||
+            currentLocal.y1 !== currentLocal.y2)) ||
+        (currentLocal.tipo === "rectangulo" &&
+          currentLocal.width > 0 &&
+          currentLocal.height > 0) ||
+        (currentLocal.tipo === "circulo" && currentLocal.r > 0);
+      if (valid) {
+        addElemento(currentLocal);
+      }
+    }
+    setCurrentLocal(null);
+    setDrawStart(null);
+    setIsDrawing(false);
   };
 
   const handleMouseUp = () => {
     if (isDragging) {
       setIsDragging(false);
     }
-    if (isDrawing && currentStroke && currentStroke.length > 1) {
-      addStroke({ puntos: currentStroke, color: colorLapiz, grosor: grosorLapiz });
-      setCurrentStroke(null);
+    if (isDrawing) {
+      finalizeDrawing();
     }
-    setIsDrawing(false);
   };
 
   const handleMouseLeave = () => {
     if (isDragging) setIsDragging(false);
-    if (isDrawing && currentStroke && currentStroke.length > 1) {
-      addStroke({ puntos: currentStroke, color: colorLapiz, grosor: grosorLapiz });
-      setCurrentStroke(null);
-    }
-    setIsDrawing(false);
+    if (isDrawing) finalizeDrawing();
   };
 
   const esColorClaro = (hex: string): boolean => {
@@ -147,8 +241,8 @@ function Lienzo() {
 
   const getCursor = () => {
     if (herramientaActual === "mover") return isDragging ? "grabbing" : "grab";
-    if (herramientaActual === "lapiz") return "crosshair";
-    return "default";
+    if (herramientaActual === "figuras") return "crosshair";
+    if (herramientaActual === "seleccionar") return "default";
   };
 
   return (
@@ -163,8 +257,7 @@ function Lienzo() {
         }`}
         style={{
           backgroundColor: colorLienzo,
-          maxWidth: "100%",
-          maxHeight: "100%",
+          aspectRatio: "1 / 1",
           cursor: getCursor(),
         }}
         onMouseDown={handleMouseDown}
@@ -185,27 +278,131 @@ function Lienzo() {
             />
           </pattern>
         </defs>
-        <rect width={tamano} height={tamano} fill="url(#grid)" />
+        <rect
+          x={centeredOffset.x}
+          y={centeredOffset.y}
+          width={viewBoxSize}
+          height={viewBoxSize}
+          fill="url(#grid)"
+        />
         <g clipPath="url(#lienzoClip)">
-          {strokes.map((stroke, i) => (
-            <path
-              key={i}
-              d={puntosToPath(stroke.puntos)}
-              stroke={stroke.color}
-              strokeWidth={stroke.grosor}
-              fill="none"
+          {elementos.map((el) => {
+            const sel = el.id === selectedElementId;
+            switch (el.tipo) {
+              case "linea":
+                return (
+                  <g key={el.id}>
+                    {sel && (
+                      <line
+                        x1={el.x1}
+                        y1={el.y1}
+                        x2={el.x2}
+                        y2={el.y2}
+                        stroke="#3b82f6"
+                        strokeWidth={el.grosor + 4}
+                        strokeLinecap="round"
+                        strokeDasharray="4,4"
+                        pointerEvents="none"
+                      />
+                    )}
+                    <line
+                      data-element-id={el.id}
+                      x1={el.x1}
+                      y1={el.y1}
+                      x2={el.x2}
+                      y2={el.y2}
+                      stroke={el.color}
+                      strokeWidth={el.grosor}
+                      strokeLinecap="round"
+                    />
+                  </g>
+                );
+              case "rectangulo":
+                return (
+                  <g key={el.id}>
+                    {sel && (
+                      <rect
+                        x={el.x - 3}
+                        y={el.y - 3}
+                        width={el.width + 6}
+                        height={el.height + 6}
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        fill="none"
+                        strokeDasharray="4,4"
+                        pointerEvents="none"
+                      />
+                    )}
+                    <rect
+                      data-element-id={el.id}
+                      x={el.x}
+                      y={el.y}
+                      width={el.width}
+                      height={el.height}
+                      stroke={el.color}
+                      strokeWidth={el.grosor}
+                      fill="none"
+                    />
+                  </g>
+                );
+              case "circulo":
+                return (
+                  <g key={el.id}>
+                    {sel && (
+                      <circle
+                        cx={el.cx}
+                        cy={el.cy}
+                        r={el.r + 3}
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        fill="none"
+                        strokeDasharray="4,4"
+                        pointerEvents="none"
+                      />
+                    )}
+                    <circle
+                      data-element-id={el.id}
+                      cx={el.cx}
+                      cy={el.cy}
+                      r={el.r}
+                      stroke={el.color}
+                      strokeWidth={el.grosor}
+                      fill="none"
+                    />
+                  </g>
+                );
+            }
+          })}
+          {currentLocal?.tipo === "linea" && (
+            <line
+              x1={currentLocal.x1}
+              y1={currentLocal.y1}
+              x2={currentLocal.x2}
+              y2={currentLocal.y2}
+              stroke={currentLocal.color}
+              strokeWidth={currentLocal.grosor}
               strokeLinecap="round"
-              strokeLinejoin="round"
             />
-          ))}
-          {currentStroke && currentStroke.length > 1 && (
-            <path
-              d={puntosToPath(currentStroke)}
-              stroke={colorLapiz}
-              strokeWidth={grosorLapiz}
+          )}
+          {currentLocal?.tipo === "rectangulo" && (
+            <rect
+              x={currentLocal.x}
+              y={currentLocal.y}
+              width={currentLocal.width}
+              height={currentLocal.height}
+              stroke={currentLocal.color}
+              strokeWidth={currentLocal.grosor}
               fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            />
+          )}
+          {currentLocal?.tipo === "circulo" && (
+            <circle
+              cx={currentLocal.cx}
+              cy={currentLocal.cy}
+              r={currentLocal.r}
+              stroke={currentLocal.color}
+              strokeWidth={currentLocal.grosor}
+              fill="none"
             />
           )}
         </g>

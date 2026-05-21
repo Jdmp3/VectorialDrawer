@@ -2,7 +2,7 @@ import { useContext, useState, useEffect } from "react";
 import { LienzoContext } from "./ContextDeLienzo";
 
 function Toolbar() {
-  const { herramientaActual, setHerramientaActual, clearStrokes, mostrarPrompt } =
+  const { herramientaActual, setHerramientaActual, clearElementos, mostrarPrompt } =
     useContext(LienzoContext);
 
   const [visible, setVisible] = useState(false);
@@ -17,12 +17,12 @@ function Toolbar() {
     setHerramientaActual("mover");
   };
 
-  const handleLapizClick = () => {
-    setHerramientaActual("lapiz");
+  const handleFigurasClick = () => {
+    setHerramientaActual("figuras");
   };
 
   const handleLimpiarClick = () => {
-    clearStrokes();
+    clearElementos();
   };
 
   return (
@@ -42,14 +42,24 @@ function Toolbar() {
         Mover
       </button>
       <button
-        onClick={handleLapizClick}
+        onClick={() => setHerramientaActual("seleccionar")}
         className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-          herramientaActual === "lapiz"
+          herramientaActual === "seleccionar"
             ? "bg-blue-600 text-white"
             : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
         }`}
       >
-        Lápiz
+        Seleccionar
+      </button>
+      <button
+        onClick={handleFigurasClick}
+        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          herramientaActual === "figuras"
+            ? "bg-blue-600 text-white"
+            : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
+        }`}
+      >
+        Figuras
       </button>
       <button
         onClick={handleLimpiarClick}

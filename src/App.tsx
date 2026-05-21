@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Prompteador from "./Components/PromptDeLienzo";
 import Lienzo from "./Components/Lienzo";
 import ZoomBar from "./Components/ZoomBar";
 import BotonGrosor from "./Components/BotonGrosor";
 import Toolbar from "./Components/Toolbar";
-import PanelLapiz from "./Components/PanelLapiz";
-import { LienzoContext, Stroke } from "./Components/ContextDeLienzo";
+import PanelFiguras from "./Components/PanelFiguras";
+import { LienzoContext, VectorElement } from "./Components/ContextDeLienzo";
 
 function App() {
   const [tamano, setTamano] = useState(16);
@@ -15,18 +15,30 @@ function App() {
   const [offsetRender, setOffsetRender] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [grosorBorde, setGrosorBorde] = useState(0.1);
-  const [herramientaActual, setHerramientaActual] = useState<"lapiz" | "mover">("mover");
-  const [colorLapiz, setColorLapiz] = useState("#000000");
-  const [grosorLapiz, setGrosorLapiz] = useState(2);
-  const [strokes, setStrokes] = useState<Stroke[]>([]);
-  const [currentStroke, setCurrentStroke] = useState<{ x: number; y: number }[] | null>(null);
+  const [herramientaActual, setHerramientaActual] = useState<"figuras" | "mover" | "seleccionar">("mover");
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [figuraTipo, setFiguraTipo] = useState<"linea" | "rectangulo" | "circulo">("linea");
+  const [colorFigura, setColorFigura] = useState("#000000");
+  const [grosorFigura, setGrosorFigura] = useState(2);
+  const [elementos, setElementos] = useState<VectorElement[]>([]);
 
-  const addStroke = (stroke: Stroke) => {
-    setStrokes([...strokes, stroke]);
+  useEffect(() => {
+    if (herramientaActual !== "seleccionar") {
+      setSelectedElementId(null);
+    }
+  }, [herramientaActual]);
+
+  const addElemento = (el: VectorElement) => {
+    setElementos([...elementos, el]);
   };
 
-  const clearStrokes = () => {
-    setStrokes([]);
+  const clearElementos = () => {
+    if (herramientaActual === "seleccionar" && selectedElementId) {
+      setElementos(elementos.filter(el => el.id !== selectedElementId));
+      setSelectedElementId(null);
+    } else {
+      setElementos([]);
+    }
   };
 
   return (
@@ -47,22 +59,25 @@ function App() {
         setGrosorBorde,
         herramientaActual,
         setHerramientaActual,
-        colorLapiz,
-        setColorLapiz,
-        grosorLapiz,
-        setGrosorLapiz,
-        strokes,
-        setStrokes,
-        addStroke,
-        clearStrokes,
-        currentStroke,
-        setCurrentStroke,
+        figuraTipo,
+        setFiguraTipo,
+        colorFigura,
+        setColorFigura,
+        grosorFigura,
+        setGrosorFigura,
+        elementos,
+        currentElement: null,
+        setCurrentElement: () => {},
+        selectedElementId,
+        setSelectedElementId,
+        addElemento,
+        clearElementos,
       }}
     >
       <section className="w-full h-screen bg-gray-700 overflow-hidden">
         <Lienzo />
         <Toolbar />
-        <PanelLapiz />
+        <PanelFiguras />
         <ZoomBar />
         <BotonGrosor />
         <Prompteador

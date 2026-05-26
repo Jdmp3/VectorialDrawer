@@ -72,7 +72,7 @@ function PanelFiguras() {
         <input
           type="range"
           min="1"
-          max="20"
+          max="10"
           value={grosorFigura}
           onChange={(e) => setGrosorFigura(Number(e.target.value))}
           className="w-32 cursor-pointer"

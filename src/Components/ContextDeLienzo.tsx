@@ -57,6 +57,7 @@ interface LienzoContextType {
   selectedElementId: string | null;
   setSelectedElementId: (id: string | null) => void;
   addElemento: (el: VectorElement) => void;
+  actualizarElemento: (id: string, elemento: VectorElement) => void;
   clearElementos: () => void;
 }
 
@@ -88,5 +89,6 @@ export const LienzoContext = createContext<LienzoContextType>({
   selectedElementId: null,
   setSelectedElementId: () => {},
   addElemento: () => {},
+  actualizarElemento: () => {},
   clearElementos: () => {},
 });

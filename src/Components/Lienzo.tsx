@@ -27,6 +27,7 @@ function Lienzo() {
     grosorFigura,
     elementos,
     addElemento,
+    actualizarElemento,
     selectedElementId,
     setSelectedElementId,
   } = useContext(LienzoContext);
@@ -43,6 +44,12 @@ function Lienzo() {
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(
     null,
   );
+  const [isDraggingElement, setIsDraggingElement] = useState(false);
+  const [dragElementStart, setDragElementStart] = useState<{
+    mouseX: number;
+    mouseY: number;
+    initialPos: VectorElement;
+  } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -157,6 +164,18 @@ function Lienzo() {
       const target = e.target as SVGElement;
       const id = target.getAttribute("data-element-id");
       setSelectedElementId(id);
+      if (id) {
+        const element = elementos.find((el) => el.id === id);
+        if (element) {
+          const pos = getMousePosition(e);
+          setIsDraggingElement(true);
+          setDragElementStart({
+            mouseX: pos.x,
+            mouseY: pos.y,
+            initialPos: { ...element },
+          });
+        }
+      }
     }
   };
 
@@ -167,6 +186,34 @@ function Lienzo() {
       const newX = clamp(dragStart.offsetX + deltaX, 0, maxOffset);
       const newY = clamp(dragStart.offsetY + deltaY, 0, maxOffset);
       setOffsetReal({ x: newX, y: newY });
+    } else if (
+      isDraggingElement &&
+      dragElementStart &&
+      herramientaActual === "seleccionar"
+    ) {
+      const pos = getMousePosition(e);
+      const dx = pos.x - dragElementStart.mouseX;
+      const dy = pos.y - dragElementStart.mouseY;
+      const original = dragElementStart.initialPos;
+      let updated: VectorElement;
+      switch (original.tipo) {
+        case "linea":
+          updated = {
+            ...original,
+            x1: original.x1 + dx,
+            y1: original.y1 + dy,
+            x2: original.x2 + dx,
+            y2: original.y2 + dy,
+          };
+          break;
+        case "rectangulo":
+          updated = { ...original, x: original.x + dx, y: original.y + dy };
+          break;
+        case "circulo":
+          updated = { ...original, cx: original.cx + dx, cy: original.cy + dy };
+          break;
+      }
+      actualizarElemento(original.id, updated);
     } else if (
       isDrawing &&
       herramientaActual === "figuras" &&
@@ -222,11 +269,13 @@ function Lienzo() {
     if (isDrawing) {
       finalizeDrawing();
     }
+    if (isDraggingElement) setIsDraggingElement(false);
   };
 
   const handleMouseLeave = () => {
     if (isDragging) setIsDragging(false);
     if (isDrawing) finalizeDrawing();
+    if (isDraggingElement) setIsDraggingElement(false);
   };
 
   const esColorClaro = (hex: string): boolean => {
@@ -242,7 +291,8 @@ function Lienzo() {
   const getCursor = () => {
     if (herramientaActual === "mover") return isDragging ? "grabbing" : "grab";
     if (herramientaActual === "figuras") return "crosshair";
-    if (herramientaActual === "seleccionar") return "default";
+    if (herramientaActual === "seleccionar")
+      return isDraggingElement ? "grabbing" : "default";
   };
 
   return (
@@ -288,23 +338,83 @@ function Lienzo() {
         <g clipPath="url(#lienzoClip)">
           {elementos.map((el) => {
             const sel = el.id === selectedElementId;
+            const swSel =
+              tamano === 16
+                ? 0.7
+                : tamano === 32
+                  ? 1.2
+                  : tamano === 64
+                    ? 1.5
+                    : tamano === 128
+                      ? 1.8
+                      : tamano === 200
+                        ? 2.2
+                        : 2.5;
+            const offsetSel =
+              tamano === 16
+                ? 1.8
+                : tamano === 32
+                  ? 2.8
+                  : tamano === 64
+                    ? 3.2
+                    : tamano === 128
+                      ? 3.8
+                      : tamano === 200
+                        ? 4
+                        : 4;
             switch (el.tipo) {
               case "linea":
                 return (
                   <g key={el.id}>
-                    {sel && (
-                      <line
-                        x1={el.x1}
-                        y1={el.y1}
-                        x2={el.x2}
-                        y2={el.y2}
-                        stroke="#3b82f6"
-                        strokeWidth={el.grosor + 4}
-                        strokeLinecap="round"
-                        strokeDasharray="4,4"
-                        pointerEvents="none"
-                      />
-                    )}
+                    {sel &&
+                      (() => {
+                        const dx = el.x2 - el.x1;
+                        const dy = el.y2 - el.y1;
+                        const len = Math.hypot(dx, dy) || 1;
+                        const pad =
+                          tamano === 16
+                            ? 2
+                            : tamano === 32
+                              ? 4
+                              : tamano === 64
+                                ? 6
+                                : tamano === 128
+                                  ? 7
+                                  : tamano === 200
+                                    ? 7.5
+                                    : 8;
+                        const sw =
+                          tamano === 16
+                            ? 0.6
+                            : tamano === 32
+                              ? 1.2
+                              : tamano === 64
+                                ? 1.8
+                                : tamano === 128
+                                  ? 2.4
+                                  : tamano === 200
+                                    ? 3.0
+                                    : 3.6;
+                        const ux = -dy / len;
+                        const uy = dx / len;
+                        const vx = dx / len;
+                        const vy = dy / len;
+                        return (
+                          <polygon
+                            points={[
+                              `${el.x1 + ux * pad - vx * pad},${el.y1 + uy * pad - vy * pad}`,
+                              `${el.x2 + ux * pad + vx * pad},${el.y2 + uy * pad + vy * pad}`,
+                              `${el.x2 - ux * pad + vx * pad},${el.y2 - uy * pad + vy * pad}`,
+                              `${el.x1 - ux * pad - vx * pad},${el.y1 - uy * pad - vy * pad}`,
+                            ].join(" ")}
+                            fill="none"
+                            stroke="#3b82f6"
+                            strokeWidth={sw}
+                            strokeDasharray="4,4"
+                            pointerEvents="none"
+                          />
+                        );
+                      })()}
                     <line
                       data-element-id={el.id}
                       x1={el.x1}
@@ -322,12 +432,12 @@ function Lienzo() {
                   <g key={el.id}>
                     {sel && (
                       <rect
-                        x={el.x - 3}
-                        y={el.y - 3}
-                        width={el.width + 6}
-                        height={el.height + 6}
+                        x={el.x - offsetSel}
+                        y={el.y - offsetSel}
+                        width={el.width + offsetSel * 2}
+                        height={el.height + offsetSel * 2}
                         stroke="#3b82f6"
-                        strokeWidth={2}
+                        strokeWidth={swSel}
                         fill="none"
                         strokeDasharray="4,4"
                         pointerEvents="none"
@@ -352,9 +462,9 @@ function Lienzo() {
                       <circle
                         cx={el.cx}
                         cy={el.cy}
-                        r={el.r + 3}
+                        r={el.r + offsetSel}
                         stroke="#3b82f6"
-                        strokeWidth={2}
+                        strokeWidth={swSel}
                         fill="none"
                         strokeDasharray="4,4"
                         pointerEvents="none"

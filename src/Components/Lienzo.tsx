@@ -1,5 +1,6 @@
 import { useContext, useState, useEffect, useRef } from "react";
 import { LienzoContext, VectorElement } from "./ContextDeLienzo";
+import { getHandleConfig } from "../utils/geometry";
 
 const TAMANO_VISUAL = 1024;
 const FACTOR_LERP = 0.5;
@@ -338,83 +339,12 @@ function Lienzo() {
         <g clipPath="url(#lienzoClip)">
           {elementos.map((el) => {
             const sel = el.id === selectedElementId;
-            const swSel =
-              tamano === 16
-                ? 0.7
-                : tamano === 32
-                  ? 1.2
-                  : tamano === 64
-                    ? 1.5
-                    : tamano === 128
-                      ? 1.8
-                      : tamano === 200
-                        ? 2.2
-                        : 2.5;
-            const offsetSel =
-              tamano === 16
-                ? 1.8
-                : tamano === 32
-                  ? 2.8
-                  : tamano === 64
-                    ? 3.2
-                    : tamano === 128
-                      ? 3.8
-                      : tamano === 200
-                        ? 4
-                        : 4;
+            const { offset: offsetSel, strokeWidth: swSel, handleRadius } =
+              getHandleConfig(tamano);
             switch (el.tipo) {
               case "linea":
                 return (
                   <g key={el.id}>
-                    {sel &&
-                      (() => {
-                        const dx = el.x2 - el.x1;
-                        const dy = el.y2 - el.y1;
-                        const len = Math.hypot(dx, dy) || 1;
-                        const pad =
-                          tamano === 16
-                            ? 2
-                            : tamano === 32
-                              ? 4
-                              : tamano === 64
-                                ? 6
-                                : tamano === 128
-                                  ? 7
-                                  : tamano === 200
-                                    ? 7.5
-                                    : 8;
-                        const sw =
-                          tamano === 16
-                            ? 0.6
-                            : tamano === 32
-                              ? 1.2
-                              : tamano === 64
-                                ? 1.8
-                                : tamano === 128
-                                  ? 2.4
-                                  : tamano === 200
-                                    ? 3.0
-                                    : 3.6;
-                        const ux = -dy / len;
-                        const uy = dx / len;
-                        const vx = dx / len;
-                        const vy = dy / len;
-                        return (
-                          <polygon
-                            points={[
-                              `${el.x1 + ux * pad - vx * pad},${el.y1 + uy * pad - vy * pad}`,
-                              `${el.x2 + ux * pad + vx * pad},${el.y2 + uy * pad + vy * pad}`,
-                              `${el.x2 - ux * pad + vx * pad},${el.y2 - uy * pad + vy * pad}`,
-                              `${el.x1 - ux * pad - vx * pad},${el.y1 - uy * pad - vy * pad}`,
-                            ].join(" ")}
-                            fill="none"
-                            stroke="#3b82f6"
-                            strokeWidth={sw}
-                            strokeDasharray="4,4"
-                            pointerEvents="none"
-                          />
-                        );
-                      })()}
                     <line
                       data-element-id={el.id}
                       x1={el.x1}
@@ -425,24 +355,42 @@ function Lienzo() {
                       strokeWidth={el.grosor}
                       strokeLinecap="round"
                     />
+                    {sel &&
+                      (() => {
+                        const dx = el.x2 - el.x1;
+                        const dy = el.y2 - el.y1;
+                        const len = Math.hypot(dx, dy) || 1;
+                        const { linePad: pad, lineSW: sw } = getHandleConfig(tamano);
+                        const ux = -dy / len;
+                        const uy = dx / len;
+                        const vx = dx / len;
+                        const vy = dy / len;
+                        return (
+                          <g pointerEvents="none">
+                            <polygon
+                              points={[
+                                `${el.x1 + ux * pad - vx * pad},${el.y1 + uy * pad - vy * pad}`,
+                                `${el.x2 + ux * pad + vx * pad},${el.y2 + uy * pad + vy * pad}`,
+                                `${el.x2 - ux * pad + vx * pad},${el.y2 - uy * pad + vy * pad}`,
+                                `${el.x1 - ux * pad - vx * pad},${el.y1 - uy * pad - vy * pad}`,
+                              ].join(" ")}
+                              fill="none"
+                              stroke="#3b82f6"
+                              strokeWidth={sw}
+                              pointerEvents="none"
+                            />
+                            <circle cx={el.x1 + ux * pad - vx * pad} cy={el.y1 + uy * pad - vy * pad} r={handleRadius} fill="#3b82f6" />
+                            <circle cx={el.x2 + ux * pad + vx * pad} cy={el.y2 + uy * pad + vy * pad} r={handleRadius} fill="#3b82f6" />
+                            <circle cx={el.x2 - ux * pad + vx * pad} cy={el.y2 - uy * pad + vy * pad} r={handleRadius} fill="#3b82f6" />
+                            <circle cx={el.x1 - ux * pad - vx * pad} cy={el.y1 - uy * pad - vy * pad} r={handleRadius} fill="#3b82f6" />
+                          </g>
+                        );
+                      })()}
                   </g>
                 );
               case "rectangulo":
                 return (
                   <g key={el.id}>
-                    {sel && (
-                      <rect
-                        x={el.x - offsetSel}
-                        y={el.y - offsetSel}
-                        width={el.width + offsetSel * 2}
-                        height={el.height + offsetSel * 2}
-                        stroke="#3b82f6"
-                        strokeWidth={swSel}
-                        fill="none"
-                        strokeDasharray="4,4"
-                        pointerEvents="none"
-                      />
-                    )}
                     <rect
                       data-element-id={el.id}
                       x={el.x}
@@ -453,23 +401,28 @@ function Lienzo() {
                       strokeWidth={el.grosor}
                       fill="none"
                     />
+                    {sel && (
+                      <g pointerEvents="none">
+                        <rect
+                          x={el.x - offsetSel}
+                          y={el.y - offsetSel}
+                          width={el.width + offsetSel * 2}
+                          height={el.height + offsetSel * 2}
+                          stroke="#3b82f6"
+                          strokeWidth={swSel}
+                          fill="none"
+                        />
+                        <circle cx={el.x - offsetSel} cy={el.y - offsetSel} r={handleRadius} fill="#3b82f6" />
+                        <circle cx={el.x + el.width + offsetSel} cy={el.y - offsetSel} r={handleRadius} fill="#3b82f6" />
+                        <circle cx={el.x + el.width + offsetSel} cy={el.y + el.height + offsetSel} r={handleRadius} fill="#3b82f6" />
+                        <circle cx={el.x - offsetSel} cy={el.y + el.height + offsetSel} r={handleRadius} fill="#3b82f6" />
+                      </g>
+                    )}
                   </g>
                 );
               case "circulo":
                 return (
                   <g key={el.id}>
-                    {sel && (
-                      <circle
-                        cx={el.cx}
-                        cy={el.cy}
-                        r={el.r + offsetSel}
-                        stroke="#3b82f6"
-                        strokeWidth={swSel}
-                        fill="none"
-                        strokeDasharray="4,4"
-                        pointerEvents="none"
-                      />
-                    )}
                     <circle
                       data-element-id={el.id}
                       cx={el.cx}
@@ -479,6 +432,29 @@ function Lienzo() {
                       strokeWidth={el.grosor}
                       fill="none"
                     />
+                    {sel &&
+                      (() => {
+                        const left = el.cx - el.r - offsetSel;
+                        const top = el.cy - el.r - offsetSel;
+                        const side = el.r * 2 + offsetSel * 2;
+                        return (
+                          <g pointerEvents="none">
+                            <rect
+                              x={left}
+                              y={top}
+                              width={side}
+                              height={side}
+                              stroke="#3b82f6"
+                              strokeWidth={swSel}
+                              fill="none"
+                            />
+                            <circle cx={left} cy={top} r={handleRadius} fill="#3b82f6" />
+                            <circle cx={left + side} cy={top} r={handleRadius} fill="#3b82f6" />
+                            <circle cx={left + side} cy={top + side} r={handleRadius} fill="#3b82f6" />
+                            <circle cx={left} cy={top + side} r={handleRadius} fill="#3b82f6" />
+                          </g>
+                        );
+                      })()}
                   </g>
                 );
             }

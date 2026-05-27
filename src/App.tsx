@@ -32,6 +32,10 @@ function App() {
     setElementos([...elementos, el]);
   };
 
+  const actualizarElemento = (id: string, elemento: VectorElement) => {
+    setElementos(prev => prev.map(el => el.id === id ? elemento : el));
+  };
+
   const clearElementos = () => {
     if (herramientaActual === "seleccionar" && selectedElementId) {
       setElementos(elementos.filter(el => el.id !== selectedElementId));
@@ -71,6 +75,7 @@ function App() {
         selectedElementId,
         setSelectedElementId,
         addElemento,
+        actualizarElemento,
         clearElementos,
       }}
     >

@@ -195,7 +195,9 @@ function Lienzo() {
         }
         return;
       }
-      const id = target.closest("[data-element-id]")?.getAttribute("data-element-id") ?? null;
+      const id =
+        target.closest("[data-element-id]")?.getAttribute("data-element-id") ??
+        null;
       setSelectedElementId(id);
       if (id) {
         const element = elementos.find((el) => el.id === id);
@@ -213,10 +215,13 @@ function Lienzo() {
   };
 
   const resizeRectangulo = (
-    anchorX: number, anchorY: number,
-    mouseX: number, mouseY: number,
-    origW: number, origH: number,
-    shiftKey: boolean
+    anchorX: number,
+    anchorY: number,
+    mouseX: number,
+    mouseY: number,
+    origW: number,
+    origH: number,
+    shiftKey: boolean,
   ) => {
     let rawW = mouseX - anchorX;
     let rawH = mouseY - anchorY;
@@ -238,7 +243,12 @@ function Lienzo() {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isResizing && resizeStart && resizeHandle && herramientaActual === "seleccionar") {
+    if (
+      isResizing &&
+      resizeStart &&
+      resizeHandle &&
+      herramientaActual === "seleccionar"
+    ) {
       const pos = getMousePosition(e);
       const el = resizeStart.initialElement;
       setTooltipPos({ x: e.clientX, y: e.clientY });
@@ -250,15 +260,37 @@ function Lienzo() {
           const { x: origX, y: origY, width: origW, height: origH } = el;
           let anchorX: number, anchorY: number;
           switch (resizeHandle) {
-            case "se": anchorX = origX; anchorY = origY; break;
-            case "nw": anchorX = origX + origW; anchorY = origY + origH; break;
-            case "ne": anchorX = origX; anchorY = origY + origH; break;
-            case "sw": anchorX = origX + origW; anchorY = origY; break;
-            default: anchorX = origX; anchorY = origY;
+            case "se":
+              anchorX = origX;
+              anchorY = origY;
+              break;
+            case "nw":
+              anchorX = origX + origW;
+              anchorY = origY + origH;
+              break;
+            case "ne":
+              anchorX = origX;
+              anchorY = origY + origH;
+              break;
+            case "sw":
+              anchorX = origX + origW;
+              anchorY = origY;
+              break;
+            default:
+              anchorX = origX;
+              anchorY = origY;
           }
           updated = {
             ...el,
-            ...resizeRectangulo(anchorX, anchorY, pos.x, pos.y, origW, origH, e.shiftKey),
+            ...resizeRectangulo(
+              anchorX,
+              anchorY,
+              pos.x,
+              pos.y,
+              origW,
+              origH,
+              e.shiftKey,
+            ),
           };
           break;
         }
@@ -370,9 +402,15 @@ function Lienzo() {
   };
 
   const handleMouseUp = () => {
-    if (isResizing) { endResize(); }
-    if (isDragging) { setIsDragging(false); }
-    if (isDrawing) { finalizeDrawing(); }
+    if (isResizing) {
+      endResize();
+    }
+    if (isDragging) {
+      setIsDragging(false);
+    }
+    if (isDrawing) {
+      finalizeDrawing();
+    }
     if (isDraggingElement) setIsDraggingElement(false);
   };
 
@@ -448,8 +486,11 @@ function Lienzo() {
         <g clipPath="url(#lienzoClip)">
           {elementos.map((el) => {
             const sel = el.id === selectedElementId;
-            const { offset: offsetSel, strokeWidth: swSel, handleRadius } =
-              getHandleConfig(tamano);
+            const {
+              offset: offsetSel,
+              strokeWidth: swSel,
+              handleRadius,
+            } = getHandleConfig(tamano);
             switch (el.tipo) {
               case "linea":
                 return (
@@ -465,8 +506,22 @@ function Lienzo() {
                     />
                     {sel && (
                       <g>
-                        <circle data-handle-id="p1" cx={el.x1} cy={el.y1} r={handleRadius * 1.5} fill="#3b82f6" cursor="move" />
-                        <circle data-handle-id="p2" cx={el.x2} cy={el.y2} r={handleRadius * 1.5} fill="#3b82f6" cursor="move" />
+                        <circle
+                          data-handle-id="p1"
+                          cx={el.x1}
+                          cy={el.y1}
+                          r={handleRadius * 0.4}
+                          fill="#3b82f6"
+                          cursor="move"
+                        />
+                        <circle
+                          data-handle-id="p2"
+                          cx={el.x2}
+                          cy={el.y2}
+                          r={handleRadius * 0.4}
+                          fill="#3b82f6"
+                          cursor="move"
+                        />
                       </g>
                     )}
                   </g>
@@ -491,14 +546,42 @@ function Lienzo() {
                           width={el.width + offsetSel * 2}
                           height={el.height + offsetSel * 2}
                           stroke="#3b82f6"
-                          strokeWidth={swSel}
+                          strokeWidth={swSel - 0.5}
                           fill="none"
                           pointerEvents="none"
                         />
-                        <circle data-handle-id="nw" cx={el.x - offsetSel} cy={el.y - offsetSel} r={handleRadius} fill="#3b82f6" cursor="nwse-resize" />
-                        <circle data-handle-id="ne" cx={el.x + el.width + offsetSel} cy={el.y - offsetSel} r={handleRadius} fill="#3b82f6" cursor="nesw-resize" />
-                        <circle data-handle-id="se" cx={el.x + el.width + offsetSel} cy={el.y + el.height + offsetSel} r={handleRadius} fill="#3b82f6" cursor="nwse-resize" />
-                        <circle data-handle-id="sw" cx={el.x - offsetSel} cy={el.y + el.height + offsetSel} r={handleRadius} fill="#3b82f6" cursor="nesw-resize" />
+                        <circle
+                          data-handle-id="nw"
+                          cx={el.x - offsetSel}
+                          cy={el.y - offsetSel}
+                          r={handleRadius * 0.6}
+                          fill="#3b82f6"
+                          cursor="nwse-resize"
+                        />
+                        <circle
+                          data-handle-id="ne"
+                          cx={el.x + el.width + offsetSel}
+                          cy={el.y - offsetSel}
+                          r={handleRadius * 0.6}
+                          fill="#3b82f6"
+                          cursor="nesw-resize"
+                        />
+                        <circle
+                          data-handle-id="se"
+                          cx={el.x + el.width + offsetSel}
+                          cy={el.y + el.height + offsetSel}
+                          r={handleRadius * 0.6}
+                          fill="#3b82f6"
+                          cursor="nwse-resize"
+                        />
+                        <circle
+                          data-handle-id="sw"
+                          cx={el.x - offsetSel}
+                          cy={el.y + el.height + offsetSel}
+                          r={handleRadius * 0.6}
+                          fill="#3b82f6"
+                          cursor="nesw-resize"
+                        />
                       </g>
                     )}
                   </g>
@@ -528,14 +611,42 @@ function Lienzo() {
                               width={side}
                               height={side}
                               stroke="#3b82f6"
-                              strokeWidth={swSel}
+                              strokeWidth={swSel - 0.5}
                               fill="none"
                               pointerEvents="none"
                             />
-                            <circle data-handle-id="nw" cx={left} cy={top} r={handleRadius} fill="#3b82f6" cursor="nwse-resize" />
-                            <circle data-handle-id="ne" cx={left + side} cy={top} r={handleRadius} fill="#3b82f6" cursor="nesw-resize" />
-                            <circle data-handle-id="se" cx={left + side} cy={top + side} r={handleRadius} fill="#3b82f6" cursor="nwse-resize" />
-                            <circle data-handle-id="sw" cx={left} cy={top + side} r={handleRadius} fill="#3b82f6" cursor="nesw-resize" />
+                            <circle
+                              data-handle-id="nw"
+                              cx={left}
+                              cy={top}
+                              r={handleRadius * 0.6}
+                              fill="#3b82f6"
+                              cursor="nwse-resize"
+                            />
+                            <circle
+                              data-handle-id="ne"
+                              cx={left + side}
+                              cy={top}
+                              r={handleRadius * 0.6}
+                              fill="#3b82f6"
+                              cursor="nesw-resize"
+                            />
+                            <circle
+                              data-handle-id="se"
+                              cx={left + side}
+                              cy={top + side}
+                              r={handleRadius * 0.6}
+                              fill="#3b82f6"
+                              cursor="nwse-resize"
+                            />
+                            <circle
+                              data-handle-id="sw"
+                              cx={left}
+                              cy={top + side}
+                              r={handleRadius * 0.6}
+                              fill="#3b82f6"
+                              cursor="nesw-resize"
+                            />
                           </g>
                         );
                       })()}
@@ -577,46 +688,47 @@ function Lienzo() {
           )}
         </g>
       </svg>
-      {isResizing && (() => {
-        const selEl = selectedElementId
-          ? elementos.find(el => el.id === selectedElementId)
-          : null;
-        if (!selEl) return null;
-        let texto = "";
-        switch (selEl.tipo) {
-          case "rectangulo":
-            texto = `${Math.round(selEl.width)} × ${Math.round(selEl.height)}`;
-            break;
-          case "circulo":
-            texto = `r: ${Math.round(selEl.r)}`;
-            break;
-          case "linea": {
-            const d = Math.hypot(selEl.x2 - selEl.x1, selEl.y2 - selEl.y1);
-            texto = `${Math.round(d * 10) / 10}`;
-            break;
+      {isResizing &&
+        (() => {
+          const selEl = selectedElementId
+            ? elementos.find((el) => el.id === selectedElementId)
+            : null;
+          if (!selEl) return null;
+          let texto = "";
+          switch (selEl.tipo) {
+            case "rectangulo":
+              texto = `${Math.round(selEl.width)} × ${Math.round(selEl.height)}`;
+              break;
+            case "circulo":
+              texto = `r: ${Math.round(selEl.r)}`;
+              break;
+            case "linea": {
+              const d = Math.hypot(selEl.x2 - selEl.x1, selEl.y2 - selEl.y1);
+              texto = `${Math.round(d * 10) / 10}`;
+              break;
+            }
           }
-        }
-        return (
-          <div
-            style={{
-              position: "fixed",
-              left: tooltipPos.x + 16,
-              top: tooltipPos.y - 32,
-              background: "rgba(0,0,0,0.75)",
-              color: "white",
-              padding: "4px 10px",
-              borderRadius: 6,
-              fontSize: 14,
-              pointerEvents: "none",
-              whiteSpace: "nowrap",
-              zIndex: 999,
-              fontFamily: "monospace",
-            }}
-          >
-            {texto}
-          </div>
-        );
-      })()}
+          return (
+            <div
+              style={{
+                position: "fixed",
+                left: tooltipPos.x + 16,
+                top: tooltipPos.y - 32,
+                background: "rgba(0,0,0,0.75)",
+                color: "white",
+                padding: "4px 10px",
+                borderRadius: 6,
+                fontSize: 14,
+                pointerEvents: "none",
+                whiteSpace: "nowrap",
+                zIndex: 999,
+                fontFamily: "monospace",
+              }}
+            >
+              {texto}
+            </div>
+          );
+        })()}
     </div>
   );
 }

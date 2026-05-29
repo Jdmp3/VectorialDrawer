@@ -154,6 +154,7 @@ function Lienzo() {
             height: 0,
             color: colorFigura,
             grosor: grosorFigura,
+            degres: 0,
           };
           break;
         case "circulo":
@@ -529,17 +530,17 @@ function Lienzo() {
               case "rectangulo":
                 return (
                   <g key={el.id} data-element-id={el.id}>
-                    <rect
-                      x={el.x}
-                      y={el.y}
-                      width={el.width}
-                      height={el.height}
-                      stroke={el.color}
-                      strokeWidth={el.grosor}
-                      fill="none"
-                    />
-                    {sel && (
-                      <g>
+                    <g transform={`rotate(${el.degres}, ${el.x + el.width / 2}, ${el.y + el.height / 2})`}>
+                      <rect
+                        x={el.x}
+                        y={el.y}
+                        width={el.width}
+                        height={el.height}
+                        stroke={el.color}
+                        strokeWidth={el.grosor}
+                        fill="none"
+                      />
+                      {sel && (
                         <rect
                           x={el.x - offsetSel}
                           y={el.y - offsetSel}
@@ -550,6 +551,10 @@ function Lienzo() {
                           fill="none"
                           pointerEvents="none"
                         />
+                      )}
+                    </g>
+                    {sel && el.degres === 0 && (
+                      <>
                         <circle
                           data-handle-id="nw"
                           cx={el.x - offsetSel}
@@ -582,7 +587,7 @@ function Lienzo() {
                           fill="#3b82f6"
                           cursor="nesw-resize"
                         />
-                      </g>
+                      </>
                     )}
                   </g>
                 );

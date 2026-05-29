@@ -16,6 +16,7 @@ export interface RectShape {
   width: number; height: number;
   color: string;
   grosor: number;
+  degres: number;
 }
 
 export interface CircleShape {

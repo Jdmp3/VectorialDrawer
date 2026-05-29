@@ -3,6 +3,7 @@ import Prompteador from "./Components/PromptDeLienzo";
 import Lienzo from "./Components/Lienzo";
 import ZoomBar from "./Components/ZoomBar";
 import BotonGrosor from "./Components/BotonGrosor";
+import BotonRotacion from "./Components/BotonRotacion";
 import Toolbar from "./Components/Toolbar";
 import PanelFiguras from "./Components/PanelFiguras";
 import { LienzoContext, VectorElement } from "./Components/ContextDeLienzo";
@@ -85,6 +86,7 @@ function App() {
         <PanelFiguras />
         <ZoomBar />
         <BotonGrosor />
+        <BotonRotacion />
         <Prompteador
           mostrarPrompt={mostrarPrompt}
           setMostrarPrompt={setMostrarPrompt}

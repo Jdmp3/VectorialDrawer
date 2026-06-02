@@ -6,5 +6,7 @@ export function getHandleConfig(tamano: number) {
     handleRadius: 1.0 + 2.0 * f,
     linePad: 2.0 + 6.0 * f,
     lineSW: 0.6 + 3.0 * f,
+    rotationHandleDistance: 3.0 + 3.0 * f,
+    rotationLineWidth: 0.3 + 0.7 * f,
   };
 }

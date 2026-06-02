@@ -61,6 +61,14 @@ function Lienzo() {
     initialElement: VectorElement;
   } | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotateStart, setRotateStart] = useState<{
+    mouseX: number;
+    mouseY: number;
+    centerX: number;
+    centerY: number;
+    initialDegres: number;
+  } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -176,6 +184,26 @@ function Lienzo() {
       const target = e.target as SVGElement;
       const handleId = target.getAttribute("data-handle-id");
       if (handleId) {
+        if (handleId === "rotate") {
+          const parentEl = target.closest("[data-element-id]");
+          const id = parentEl?.getAttribute("data-element-id") ?? null;
+          if (id) {
+            const element = elementos.find((el) => el.id === id);
+            if (element && element.tipo === "rectangulo") {
+              const pos = getMousePosition(e);
+              setSelectedElementId(id);
+              setIsRotating(true);
+              setRotateStart({
+                mouseX: pos.x,
+                mouseY: pos.y,
+                centerX: element.x + element.width / 2,
+                centerY: element.y + element.height / 2,
+                initialDegres: element.degres,
+              });
+            }
+          }
+          return;
+        }
         const parentEl = target.closest("[data-element-id]");
         const id = parentEl?.getAttribute("data-element-id") ?? null;
         if (id) {
@@ -314,6 +342,30 @@ function Lienzo() {
       return;
     }
 
+    if (isRotating && rotateStart && herramientaActual === "seleccionar") {
+      const pos = getMousePosition(e);
+      setTooltipPos({ x: e.clientX, y: e.clientY });
+      const currentAngle =
+        (Math.atan2(pos.y - rotateStart.centerY, pos.x - rotateStart.centerX) *
+          180) /
+        Math.PI;
+      const startAngle =
+        (Math.atan2(
+          rotateStart.mouseY - rotateStart.centerY,
+          rotateStart.mouseX - rotateStart.centerX,
+        ) *
+          180) /
+        Math.PI;
+      const deltaDeg = currentAngle - startAngle;
+      const newDegres =
+        (((rotateStart.initialDegres + deltaDeg) % 360) + 360) % 360;
+      const el = elementos.find((e) => e.id === selectedElementId);
+      if (el && el.tipo === "rectangulo") {
+        actualizarElemento(el.id, { ...el, degres: newDegres });
+      }
+      return;
+    }
+
     if (isDragging && herramientaActual === "mover") {
       const deltaX = (dragStart.x - e.clientX) / zoom;
       const deltaY = (dragStart.y - e.clientY) / zoom;
@@ -403,6 +455,10 @@ function Lienzo() {
   };
 
   const handleMouseUp = () => {
+    if (isRotating) {
+      setIsRotating(false);
+      setRotateStart(null);
+    }
     if (isResizing) {
       endResize();
     }
@@ -416,6 +472,10 @@ function Lienzo() {
   };
 
   const handleMouseLeave = () => {
+    if (isRotating) {
+      setIsRotating(false);
+      setRotateStart(null);
+    }
     if (isResizing) endResize();
     if (isDragging) setIsDragging(false);
     if (isDrawing) finalizeDrawing();
@@ -433,6 +493,7 @@ function Lienzo() {
   const colorCuadricula = esColorClaro(colorLienzo) ? "black" : "gray";
 
   const getCursor = () => {
+    if (isRotating) return "grabbing";
     if (isResizing && resizeHandle) {
       if (resizeHandle === "nw" || resizeHandle === "se") return "nwse-resize";
       if (resizeHandle === "ne" || resizeHandle === "sw") return "nesw-resize";
@@ -491,6 +552,8 @@ function Lienzo() {
               offset: offsetSel,
               strokeWidth: swSel,
               handleRadius,
+              rotationHandleDistance,
+              rotationLineWidth,
             } = getHandleConfig(tamano);
             switch (el.tipo) {
               case "linea":
@@ -530,7 +593,9 @@ function Lienzo() {
               case "rectangulo":
                 return (
                   <g key={el.id} data-element-id={el.id}>
-                    <g transform={`rotate(${el.degres}, ${el.x + el.width / 2}, ${el.y + el.height / 2})`}>
+                    <g
+                      transform={`rotate(${el.degres}, ${el.x + el.width / 2}, ${el.y + el.height / 2})`}
+                    >
                       <rect
                         x={el.x}
                         y={el.y}
@@ -552,6 +617,63 @@ function Lienzo() {
                           pointerEvents="none"
                         />
                       )}
+                      {sel && (() => {
+                        const canvasCX = tamano / 2;
+                        const canvasCY = tamano / 2;
+                        const rectCX = el.x + el.width / 2;
+                        const rectCY = el.y + el.height / 2;
+                        const targetAngle = Math.atan2(canvasCY - rectCY, canvasCX - rectCX) * 180 / Math.PI;
+                        const angleDiff = (a: number, b: number) => ((a - b) % 360 + 540) % 360 - 180;
+                        const sides = [
+                          { name: "bottom", angle: el.degres + 90 },
+                          { name: "right", angle: el.degres },
+                          { name: "top", angle: el.degres - 90 },
+                          { name: "left", angle: el.degres + 180 },
+                        ];
+                        let closest = sides[0];
+                        let minDiff = Math.abs(angleDiff(targetAngle, closest.angle));
+                        for (let i = 1; i < sides.length; i++) {
+                          const diff = Math.abs(angleDiff(targetAngle, sides[i].angle));
+                          if (diff < minDiff) {
+                            minDiff = diff;
+                            closest = sides[i];
+                          }
+                        }
+                        const dist = rotationHandleDistance;
+                        let lx1 = 0, ly1 = 0, lx2 = 0, ly2 = 0, hx = 0, hy = 0;
+                        switch (closest.name) {
+                          case "bottom":
+                            lx1 = lx2 = el.x + el.width / 2;
+                            ly1 = el.y + el.height + offsetSel;
+                            ly2 = ly1 + dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                          case "right":
+                            lx1 = el.x + el.width + offsetSel;
+                            ly1 = ly2 = el.y + el.height / 2;
+                            lx2 = lx1 + dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                          case "top":
+                            lx1 = lx2 = el.x + el.width / 2;
+                            ly1 = el.y - offsetSel;
+                            ly2 = ly1 - dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                          case "left":
+                            lx1 = el.x - offsetSel;
+                            ly1 = ly2 = el.y + el.height / 2;
+                            lx2 = lx1 - dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                        }
+                        return (
+                          <>
+                            <line x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="#10b981" strokeWidth={rotationLineWidth} />
+                            <circle data-handle-id="rotate" cx={hx} cy={hy} r={handleRadius * 0.5} fill="#10b981" cursor="grab" />
+                          </>
+                        );
+                      })()}
                     </g>
                     {sel && el.degres === 0 && (
                       <>
@@ -693,24 +815,28 @@ function Lienzo() {
           )}
         </g>
       </svg>
-      {isResizing &&
+      {(isResizing || isRotating) &&
         (() => {
           const selEl = selectedElementId
             ? elementos.find((el) => el.id === selectedElementId)
             : null;
           if (!selEl) return null;
           let texto = "";
-          switch (selEl.tipo) {
-            case "rectangulo":
-              texto = `${Math.round(selEl.width)} × ${Math.round(selEl.height)}`;
-              break;
-            case "circulo":
-              texto = `r: ${Math.round(selEl.r)}`;
-              break;
-            case "linea": {
-              const d = Math.hypot(selEl.x2 - selEl.x1, selEl.y2 - selEl.y1);
-              texto = `${Math.round(d * 10) / 10}`;
-              break;
+          if (isRotating && selEl.tipo === "rectangulo") {
+            texto = `${Math.round(selEl.degres)}°`;
+          } else {
+            switch (selEl.tipo) {
+              case "rectangulo":
+                texto = `${Math.round(selEl.width)} X ${Math.round(selEl.height)}`;
+                break;
+              case "circulo":
+                texto = `r: ${Math.round(selEl.r)}`;
+                break;
+              case "linea": {
+                const d = Math.hypot(selEl.x2 - selEl.x1, selEl.y2 - selEl.y1);
+                texto = `${Math.round(d * 10) / 10}`;
+                break;
+              }
             }
           }
           return (

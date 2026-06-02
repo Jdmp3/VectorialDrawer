@@ -51,6 +51,24 @@ function Lienzo() {
     mouseY: number;
     initialPos: VectorElement;
   } | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  const [resizeStart, setResizeStart] = useState<{
+    mouseX: number;
+    mouseY: number;
+    mouseCanvasX: number;
+    mouseCanvasY: number;
+    initialElement: VectorElement;
+  } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotateStart, setRotateStart] = useState<{
+    mouseX: number;
+    mouseY: number;
+    centerX: number;
+    centerY: number;
+    initialDegres: number;
+  } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -144,6 +162,7 @@ function Lienzo() {
             height: 0,
             color: colorFigura,
             grosor: grosorFigura,
+            degres: 0,
           };
           break;
         case "circulo":
@@ -163,7 +182,51 @@ function Lienzo() {
       setIsDrawing(true);
     } else if (herramientaActual === "seleccionar") {
       const target = e.target as SVGElement;
-      const id = target.getAttribute("data-element-id");
+      const handleId = target.getAttribute("data-handle-id");
+      if (handleId) {
+        if (handleId === "rotate") {
+          const parentEl = target.closest("[data-element-id]");
+          const id = parentEl?.getAttribute("data-element-id") ?? null;
+          if (id) {
+            const element = elementos.find((el) => el.id === id);
+            if (element && element.tipo === "rectangulo") {
+              const pos = getMousePosition(e);
+              setSelectedElementId(id);
+              setIsRotating(true);
+              setRotateStart({
+                mouseX: pos.x,
+                mouseY: pos.y,
+                centerX: element.x + element.width / 2,
+                centerY: element.y + element.height / 2,
+                initialDegres: element.degres,
+              });
+            }
+          }
+          return;
+        }
+        const parentEl = target.closest("[data-element-id]");
+        const id = parentEl?.getAttribute("data-element-id") ?? null;
+        if (id) {
+          const element = elementos.find((el) => el.id === id);
+          if (element) {
+            const pos = getMousePosition(e);
+            setSelectedElementId(id);
+            setIsResizing(true);
+            setResizeHandle(handleId);
+            setResizeStart({
+              mouseX: e.clientX,
+              mouseY: e.clientY,
+              mouseCanvasX: pos.x,
+              mouseCanvasY: pos.y,
+              initialElement: { ...element },
+            });
+          }
+        }
+        return;
+      }
+      const id =
+        target.closest("[data-element-id]")?.getAttribute("data-element-id") ??
+        null;
       setSelectedElementId(id);
       if (id) {
         const element = elementos.find((el) => el.id === id);
@@ -180,7 +243,129 @@ function Lienzo() {
     }
   };
 
+  const resizeRectangulo = (
+    anchorX: number,
+    anchorY: number,
+    mouseX: number,
+    mouseY: number,
+    origW: number,
+    origH: number,
+    shiftKey: boolean,
+  ) => {
+    let rawW = mouseX - anchorX;
+    let rawH = mouseY - anchorY;
+    if (shiftKey && origW > 0 && origH > 0) {
+      const ratioW = rawW / origW;
+      const ratioH = rawH / origH;
+      if (Math.abs(ratioW) >= Math.abs(ratioH)) {
+        rawH = origH * ratioW;
+      } else {
+        rawW = origW * ratioH;
+      }
+    }
+    return {
+      x: rawW >= 0 ? anchorX : anchorX + rawW,
+      y: rawH >= 0 ? anchorY : anchorY + rawH,
+      width: Math.abs(rawW),
+      height: Math.abs(rawH),
+    };
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (
+      isResizing &&
+      resizeStart &&
+      resizeHandle &&
+      herramientaActual === "seleccionar"
+    ) {
+      const pos = getMousePosition(e);
+      const el = resizeStart.initialElement;
+      setTooltipPos({ x: e.clientX, y: e.clientY });
+
+      let updated: VectorElement;
+
+      switch (el.tipo) {
+        case "rectangulo": {
+          const { x: origX, y: origY, width: origW, height: origH } = el;
+          let anchorX: number, anchorY: number;
+          switch (resizeHandle) {
+            case "se":
+              anchorX = origX;
+              anchorY = origY;
+              break;
+            case "nw":
+              anchorX = origX + origW;
+              anchorY = origY + origH;
+              break;
+            case "ne":
+              anchorX = origX;
+              anchorY = origY + origH;
+              break;
+            case "sw":
+              anchorX = origX + origW;
+              anchorY = origY;
+              break;
+            default:
+              anchorX = origX;
+              anchorY = origY;
+          }
+          updated = {
+            ...el,
+            ...resizeRectangulo(
+              anchorX,
+              anchorY,
+              pos.x,
+              pos.y,
+              origW,
+              origH,
+              e.shiftKey,
+            ),
+          };
+          break;
+        }
+        case "circulo": {
+          const r = Math.hypot(pos.x - el.cx, pos.y - el.cy);
+          updated = { ...el, r };
+          break;
+        }
+        case "linea": {
+          if (resizeHandle === "p1") {
+            updated = { ...el, x1: pos.x, y1: pos.y };
+          } else {
+            updated = { ...el, x2: pos.x, y2: pos.y };
+          }
+          break;
+        }
+      }
+
+      actualizarElemento(el.id, updated);
+      return;
+    }
+
+    if (isRotating && rotateStart && herramientaActual === "seleccionar") {
+      const pos = getMousePosition(e);
+      setTooltipPos({ x: e.clientX, y: e.clientY });
+      const currentAngle =
+        (Math.atan2(pos.y - rotateStart.centerY, pos.x - rotateStart.centerX) *
+          180) /
+        Math.PI;
+      const startAngle =
+        (Math.atan2(
+          rotateStart.mouseY - rotateStart.centerY,
+          rotateStart.mouseX - rotateStart.centerX,
+        ) *
+          180) /
+        Math.PI;
+      const deltaDeg = currentAngle - startAngle;
+      const newDegres =
+        (((rotateStart.initialDegres + deltaDeg) % 360) + 360) % 360;
+      const el = elementos.find((e) => e.id === selectedElementId);
+      if (el && el.tipo === "rectangulo") {
+        actualizarElemento(el.id, { ...el, degres: newDegres });
+      }
+      return;
+    }
+
     if (isDragging && herramientaActual === "mover") {
       const deltaX = (dragStart.x - e.clientX) / zoom;
       const deltaY = (dragStart.y - e.clientY) / zoom;
@@ -263,7 +448,20 @@ function Lienzo() {
     setIsDrawing(false);
   };
 
+  const endResize = () => {
+    setIsResizing(false);
+    setResizeHandle(null);
+    setResizeStart(null);
+  };
+
   const handleMouseUp = () => {
+    if (isRotating) {
+      setIsRotating(false);
+      setRotateStart(null);
+    }
+    if (isResizing) {
+      endResize();
+    }
     if (isDragging) {
       setIsDragging(false);
     }
@@ -274,6 +472,11 @@ function Lienzo() {
   };
 
   const handleMouseLeave = () => {
+    if (isRotating) {
+      setIsRotating(false);
+      setRotateStart(null);
+    }
+    if (isResizing) endResize();
     if (isDragging) setIsDragging(false);
     if (isDrawing) finalizeDrawing();
     if (isDraggingElement) setIsDraggingElement(false);
@@ -290,6 +493,12 @@ function Lienzo() {
   const colorCuadricula = esColorClaro(colorLienzo) ? "black" : "gray";
 
   const getCursor = () => {
+    if (isRotating) return "grabbing";
+    if (isResizing && resizeHandle) {
+      if (resizeHandle === "nw" || resizeHandle === "se") return "nwse-resize";
+      if (resizeHandle === "ne" || resizeHandle === "sw") return "nesw-resize";
+      if (resizeHandle === "p1" || resizeHandle === "p2") return "move";
+    }
     if (herramientaActual === "mover") return isDragging ? "grabbing" : "grab";
     if (herramientaActual === "figuras") return "crosshair";
     if (herramientaActual === "seleccionar")
@@ -339,14 +548,18 @@ function Lienzo() {
         <g clipPath="url(#lienzoClip)">
           {elementos.map((el) => {
             const sel = el.id === selectedElementId;
-            const { offset: offsetSel, strokeWidth: swSel, handleRadius } =
-              getHandleConfig(tamano);
+            const {
+              offset: offsetSel,
+              strokeWidth: swSel,
+              handleRadius,
+              rotationHandleDistance,
+              rotationLineWidth,
+            } = getHandleConfig(tamano);
             switch (el.tipo) {
               case "linea":
                 return (
-                  <g key={el.id}>
+                  <g key={el.id} data-element-id={el.id}>
                     <line
-                      data-element-id={el.id}
                       x1={el.x1}
                       y1={el.y1}
                       x2={el.x2}
@@ -355,74 +568,154 @@ function Lienzo() {
                       strokeWidth={el.grosor}
                       strokeLinecap="round"
                     />
-                    {sel &&
-                      (() => {
-                        const dx = el.x2 - el.x1;
-                        const dy = el.y2 - el.y1;
-                        const len = Math.hypot(dx, dy) || 1;
-                        const { linePad: pad, lineSW: sw } = getHandleConfig(tamano);
-                        const ux = -dy / len;
-                        const uy = dx / len;
-                        const vx = dx / len;
-                        const vy = dy / len;
-                        return (
-                          <g pointerEvents="none">
-                            <polygon
-                              points={[
-                                `${el.x1 + ux * pad - vx * pad},${el.y1 + uy * pad - vy * pad}`,
-                                `${el.x2 + ux * pad + vx * pad},${el.y2 + uy * pad + vy * pad}`,
-                                `${el.x2 - ux * pad + vx * pad},${el.y2 - uy * pad + vy * pad}`,
-                                `${el.x1 - ux * pad - vx * pad},${el.y1 - uy * pad - vy * pad}`,
-                              ].join(" ")}
-                              fill="none"
-                              stroke="#3b82f6"
-                              strokeWidth={sw}
-                              pointerEvents="none"
-                            />
-                            <circle cx={el.x1 + ux * pad - vx * pad} cy={el.y1 + uy * pad - vy * pad} r={handleRadius} fill="#3b82f6" />
-                            <circle cx={el.x2 + ux * pad + vx * pad} cy={el.y2 + uy * pad + vy * pad} r={handleRadius} fill="#3b82f6" />
-                            <circle cx={el.x2 - ux * pad + vx * pad} cy={el.y2 - uy * pad + vy * pad} r={handleRadius} fill="#3b82f6" />
-                            <circle cx={el.x1 - ux * pad - vx * pad} cy={el.y1 - uy * pad - vy * pad} r={handleRadius} fill="#3b82f6" />
-                          </g>
-                        );
-                      })()}
+                    {sel && (
+                      <g>
+                        <circle
+                          data-handle-id="p1"
+                          cx={el.x1}
+                          cy={el.y1}
+                          r={handleRadius * 0.4}
+                          fill="#3b82f6"
+                          cursor="move"
+                        />
+                        <circle
+                          data-handle-id="p2"
+                          cx={el.x2}
+                          cy={el.y2}
+                          r={handleRadius * 0.4}
+                          fill="#3b82f6"
+                          cursor="move"
+                        />
+                      </g>
+                    )}
                   </g>
                 );
               case "rectangulo":
                 return (
-                  <g key={el.id}>
-                    <rect
-                      data-element-id={el.id}
-                      x={el.x}
-                      y={el.y}
-                      width={el.width}
-                      height={el.height}
-                      stroke={el.color}
-                      strokeWidth={el.grosor}
-                      fill="none"
-                    />
-                    {sel && (
-                      <g pointerEvents="none">
+                  <g key={el.id} data-element-id={el.id}>
+                    <g
+                      transform={`rotate(${el.degres}, ${el.x + el.width / 2}, ${el.y + el.height / 2})`}
+                    >
+                      <rect
+                        x={el.x}
+                        y={el.y}
+                        width={el.width}
+                        height={el.height}
+                        stroke={el.color}
+                        strokeWidth={el.grosor}
+                        fill="none"
+                      />
+                      {sel && (
                         <rect
                           x={el.x - offsetSel}
                           y={el.y - offsetSel}
                           width={el.width + offsetSel * 2}
                           height={el.height + offsetSel * 2}
                           stroke="#3b82f6"
-                          strokeWidth={swSel}
+                          strokeWidth={swSel - 0.5}
                           fill="none"
+                          pointerEvents="none"
                         />
-                        <circle cx={el.x - offsetSel} cy={el.y - offsetSel} r={handleRadius} fill="#3b82f6" />
-                        <circle cx={el.x + el.width + offsetSel} cy={el.y - offsetSel} r={handleRadius} fill="#3b82f6" />
-                        <circle cx={el.x + el.width + offsetSel} cy={el.y + el.height + offsetSel} r={handleRadius} fill="#3b82f6" />
-                        <circle cx={el.x - offsetSel} cy={el.y + el.height + offsetSel} r={handleRadius} fill="#3b82f6" />
-                      </g>
+                      )}
+                      {sel && (() => {
+                        const canvasCX = tamano / 2;
+                        const canvasCY = tamano / 2;
+                        const rectCX = el.x + el.width / 2;
+                        const rectCY = el.y + el.height / 2;
+                        const targetAngle = Math.atan2(canvasCY - rectCY, canvasCX - rectCX) * 180 / Math.PI;
+                        const angleDiff = (a: number, b: number) => ((a - b) % 360 + 540) % 360 - 180;
+                        const sides = [
+                          { name: "bottom", angle: el.degres + 90 },
+                          { name: "right", angle: el.degres },
+                          { name: "top", angle: el.degres - 90 },
+                          { name: "left", angle: el.degres + 180 },
+                        ];
+                        let closest = sides[0];
+                        let minDiff = Math.abs(angleDiff(targetAngle, closest.angle));
+                        for (let i = 1; i < sides.length; i++) {
+                          const diff = Math.abs(angleDiff(targetAngle, sides[i].angle));
+                          if (diff < minDiff) {
+                            minDiff = diff;
+                            closest = sides[i];
+                          }
+                        }
+                        const dist = rotationHandleDistance;
+                        let lx1 = 0, ly1 = 0, lx2 = 0, ly2 = 0, hx = 0, hy = 0;
+                        switch (closest.name) {
+                          case "bottom":
+                            lx1 = lx2 = el.x + el.width / 2;
+                            ly1 = el.y + el.height + offsetSel;
+                            ly2 = ly1 + dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                          case "right":
+                            lx1 = el.x + el.width + offsetSel;
+                            ly1 = ly2 = el.y + el.height / 2;
+                            lx2 = lx1 + dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                          case "top":
+                            lx1 = lx2 = el.x + el.width / 2;
+                            ly1 = el.y - offsetSel;
+                            ly2 = ly1 - dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                          case "left":
+                            lx1 = el.x - offsetSel;
+                            ly1 = ly2 = el.y + el.height / 2;
+                            lx2 = lx1 - dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                        }
+                        return (
+                          <>
+                            <line x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="#10b981" strokeWidth={rotationLineWidth} />
+                            <circle data-handle-id="rotate" cx={hx} cy={hy} r={handleRadius * 0.5} fill="#10b981" cursor="grab" />
+                          </>
+                        );
+                      })()}
+                    </g>
+                    {sel && el.degres === 0 && (
+                      <>
+                        <circle
+                          data-handle-id="nw"
+                          cx={el.x - offsetSel}
+                          cy={el.y - offsetSel}
+                          r={handleRadius * 0.6}
+                          fill="#3b82f6"
+                          cursor="nwse-resize"
+                        />
+                        <circle
+                          data-handle-id="ne"
+                          cx={el.x + el.width + offsetSel}
+                          cy={el.y - offsetSel}
+                          r={handleRadius * 0.6}
+                          fill="#3b82f6"
+                          cursor="nesw-resize"
+                        />
+                        <circle
+                          data-handle-id="se"
+                          cx={el.x + el.width + offsetSel}
+                          cy={el.y + el.height + offsetSel}
+                          r={handleRadius * 0.6}
+                          fill="#3b82f6"
+                          cursor="nwse-resize"
+                        />
+                        <circle
+                          data-handle-id="sw"
+                          cx={el.x - offsetSel}
+                          cy={el.y + el.height + offsetSel}
+                          r={handleRadius * 0.6}
+                          fill="#3b82f6"
+                          cursor="nesw-resize"
+                        />
+                      </>
                     )}
                   </g>
                 );
               case "circulo":
                 return (
-                  <g key={el.id}>
+                  <g key={el.id} data-element-id={el.id}>
                     <circle
                       data-element-id={el.id}
                       cx={el.cx}
@@ -438,20 +731,49 @@ function Lienzo() {
                         const top = el.cy - el.r - offsetSel;
                         const side = el.r * 2 + offsetSel * 2;
                         return (
-                          <g pointerEvents="none">
+                          <g>
                             <rect
                               x={left}
                               y={top}
                               width={side}
                               height={side}
                               stroke="#3b82f6"
-                              strokeWidth={swSel}
+                              strokeWidth={swSel - 0.5}
                               fill="none"
+                              pointerEvents="none"
                             />
-                            <circle cx={left} cy={top} r={handleRadius} fill="#3b82f6" />
-                            <circle cx={left + side} cy={top} r={handleRadius} fill="#3b82f6" />
-                            <circle cx={left + side} cy={top + side} r={handleRadius} fill="#3b82f6" />
-                            <circle cx={left} cy={top + side} r={handleRadius} fill="#3b82f6" />
+                            <circle
+                              data-handle-id="nw"
+                              cx={left}
+                              cy={top}
+                              r={handleRadius * 0.6}
+                              fill="#3b82f6"
+                              cursor="nwse-resize"
+                            />
+                            <circle
+                              data-handle-id="ne"
+                              cx={left + side}
+                              cy={top}
+                              r={handleRadius * 0.6}
+                              fill="#3b82f6"
+                              cursor="nesw-resize"
+                            />
+                            <circle
+                              data-handle-id="se"
+                              cx={left + side}
+                              cy={top + side}
+                              r={handleRadius * 0.6}
+                              fill="#3b82f6"
+                              cursor="nwse-resize"
+                            />
+                            <circle
+                              data-handle-id="sw"
+                              cx={left}
+                              cy={top + side}
+                              r={handleRadius * 0.6}
+                              fill="#3b82f6"
+                              cursor="nesw-resize"
+                            />
                           </g>
                         );
                       })()}
@@ -493,6 +815,51 @@ function Lienzo() {
           )}
         </g>
       </svg>
+      {(isResizing || isRotating) &&
+        (() => {
+          const selEl = selectedElementId
+            ? elementos.find((el) => el.id === selectedElementId)
+            : null;
+          if (!selEl) return null;
+          let texto = "";
+          if (isRotating && selEl.tipo === "rectangulo") {
+            texto = `${Math.round(selEl.degres)}°`;
+          } else {
+            switch (selEl.tipo) {
+              case "rectangulo":
+                texto = `${Math.round(selEl.width)} X ${Math.round(selEl.height)}`;
+                break;
+              case "circulo":
+                texto = `r: ${Math.round(selEl.r)}`;
+                break;
+              case "linea": {
+                const d = Math.hypot(selEl.x2 - selEl.x1, selEl.y2 - selEl.y1);
+                texto = `${Math.round(d * 10) / 10}`;
+                break;
+              }
+            }
+          }
+          return (
+            <div
+              style={{
+                position: "fixed",
+                left: tooltipPos.x + 16,
+                top: tooltipPos.y - 32,
+                background: "rgba(0,0,0,0.75)",
+                color: "white",
+                padding: "4px 10px",
+                borderRadius: 6,
+                fontSize: 14,
+                pointerEvents: "none",
+                whiteSpace: "nowrap",
+                zIndex: 999,
+                fontFamily: "monospace",
+              }}
+            >
+              {texto}
+            </div>
+          );
+        })()}
     </div>
   );
 }

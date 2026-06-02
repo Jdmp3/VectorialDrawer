@@ -9,9 +9,7 @@ export default function BotonGrosor() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!mostrarPrompt) {
-      setVisible(true);
-    }
+    setVisible(!mostrarPrompt);
   }, [mostrarPrompt]);
 
   const handleToggle = () => {

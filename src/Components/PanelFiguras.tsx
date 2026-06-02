@@ -16,9 +16,7 @@ function PanelFiguras() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!mostrarPrompt) {
-      setVisible(true);
-    }
+    setVisible(!mostrarPrompt);
   }, [mostrarPrompt]);
 
   if (herramientaActual !== "figuras") {

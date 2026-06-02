@@ -5,6 +5,7 @@ import ZoomBar from "./Components/ZoomBar";
 import BotonGrosor from "./Components/BotonGrosor";
 import Toolbar from "./Components/Toolbar";
 import PanelFiguras from "./Components/PanelFiguras";
+import MenuHamburguesa from "./Components/MenuHamburguesa";
 import { LienzoContext, VectorElement } from "./Components/ContextDeLienzo";
 
 function App() {
@@ -85,6 +86,15 @@ function App() {
         <PanelFiguras />
         <ZoomBar />
         <BotonGrosor />
+        {!mostrarPrompt && (
+          <MenuHamburguesa
+            onNuevo={() => {
+              setMostrarPrompt(true);
+              setElementos([]);
+              setSelectedElementId(null);
+            }}
+          />
+        )}
         <Prompteador
           mostrarPrompt={mostrarPrompt}
           setMostrarPrompt={setMostrarPrompt}

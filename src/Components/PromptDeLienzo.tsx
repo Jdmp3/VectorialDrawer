@@ -24,8 +24,8 @@ function Prompteador({
 
   return (
     <div
-      className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-sky-500 text-amber-50 mx-auto w-full max-w-md text-center p-6 sm:p-14 rounded-[20px] border-sky-800 border-6 transition-all duration-3500 ease-in-out z-50 ${
-        mostrarPrompt ? "" : "translate-y-[200vh]"
+      className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-sky-500 text-amber-50 mx-auto w-full max-w-md text-center p-6 sm:p-14 rounded-[20px] border-sky-800 border-6 transition-all ease-in-out z-50 ${
+        mostrarPrompt ? "duration-[300ms]" : "duration-[3500ms] translate-y-[200vh]"
       }`}
     >
       <div className="text-lg font-semibold mb-4">{PromptText}</div>

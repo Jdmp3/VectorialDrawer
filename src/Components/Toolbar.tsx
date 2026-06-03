@@ -8,9 +8,7 @@ function Toolbar() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!mostrarPrompt) {
-      setVisible(true);
-    }
+    setVisible(!mostrarPrompt);
   }, [mostrarPrompt]);
 
   const handleMoverClick = () => {

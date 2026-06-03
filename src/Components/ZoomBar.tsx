@@ -6,9 +6,7 @@ export default function ZoomBar() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!mostrarPrompt) {
-      setVisible(true);
-    }
+    setVisible(!mostrarPrompt);
   }, [mostrarPrompt]);
 
   const handleZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {

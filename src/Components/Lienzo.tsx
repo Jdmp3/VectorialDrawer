@@ -243,34 +243,6 @@ function Lienzo() {
     }
   };
 
-  const resizeRectangulo = (
-    anchorX: number,
-    anchorY: number,
-    mouseX: number,
-    mouseY: number,
-    origW: number,
-    origH: number,
-    shiftKey: boolean,
-  ) => {
-    let rawW = mouseX - anchorX;
-    let rawH = mouseY - anchorY;
-    if (shiftKey && origW > 0 && origH > 0) {
-      const ratioW = rawW / origW;
-      const ratioH = rawH / origH;
-      if (Math.abs(ratioW) >= Math.abs(ratioH)) {
-        rawH = origH * ratioW;
-      } else {
-        rawW = origW * ratioH;
-      }
-    }
-    return {
-      x: rawW >= 0 ? anchorX : anchorX + rawW,
-      y: rawH >= 0 ? anchorY : anchorY + rawH,
-      width: Math.abs(rawW),
-      height: Math.abs(rawH),
-    };
-  };
-
   const handleMouseMove = (e: React.MouseEvent) => {
     if (
       isResizing &&
@@ -286,41 +258,23 @@ function Lienzo() {
 
       switch (el.tipo) {
         case "rectangulo": {
-          const { x: origX, y: origY, width: origW, height: origH } = el;
-          let anchorX: number, anchorY: number;
+          const { x: ox, y: oy, width: ow, height: oh } = el;
           switch (resizeHandle) {
-            case "se":
-              anchorX = origX;
-              anchorY = origY;
+            case "right":
+              updated = { ...el, width: Math.max(0, pos.x - ox) };
               break;
-            case "nw":
-              anchorX = origX + origW;
-              anchorY = origY + origH;
+            case "left":
+              updated = { ...el, x: pos.x, width: Math.max(0, ox + ow - pos.x) };
               break;
-            case "ne":
-              anchorX = origX;
-              anchorY = origY + origH;
+            case "bottom":
+              updated = { ...el, height: Math.max(0, pos.y - oy) };
               break;
-            case "sw":
-              anchorX = origX + origW;
-              anchorY = origY;
+            case "top":
+              updated = { ...el, y: pos.y, height: Math.max(0, oy + oh - pos.y) };
               break;
             default:
-              anchorX = origX;
-              anchorY = origY;
+              updated = el;
           }
-          updated = {
-            ...el,
-            ...resizeRectangulo(
-              anchorX,
-              anchorY,
-              pos.x,
-              pos.y,
-              origW,
-              origH,
-              e.shiftKey,
-            ),
-          };
           break;
         }
         case "circulo": {
@@ -495,8 +449,8 @@ function Lienzo() {
   const getCursor = () => {
     if (isRotating) return "grabbing";
     if (isResizing && resizeHandle) {
-      if (resizeHandle === "nw" || resizeHandle === "se") return "nwse-resize";
-      if (resizeHandle === "ne" || resizeHandle === "sw") return "nesw-resize";
+      if (resizeHandle === "top" || resizeHandle === "bottom") return "ns-resize";
+      if (resizeHandle === "left" || resizeHandle === "right") return "ew-resize";
       if (resizeHandle === "p1" || resizeHandle === "p2") return "move";
     }
     if (herramientaActual === "mover") return isDragging ? "grabbing" : "grab";
@@ -677,37 +631,45 @@ function Lienzo() {
                     </g>
                     {sel && el.degres === 0 && (
                       <>
-                        <circle
-                          data-handle-id="nw"
-                          cx={el.x - offsetSel}
-                          cy={el.y - offsetSel}
-                          r={handleRadius * 0.6}
-                          fill="#3b82f6"
-                          cursor="nwse-resize"
+                        <line
+                          data-handle-id="top"
+                          x1={el.x - offsetSel}
+                          y1={el.y - offsetSel}
+                          x2={el.x + el.width + offsetSel}
+                          y2={el.y - offsetSel}
+                          stroke="transparent"
+                          strokeWidth={10}
+                          cursor="ns-resize"
                         />
-                        <circle
-                          data-handle-id="ne"
-                          cx={el.x + el.width + offsetSel}
-                          cy={el.y - offsetSel}
-                          r={handleRadius * 0.6}
-                          fill="#3b82f6"
-                          cursor="nesw-resize"
+                        <line
+                          data-handle-id="bottom"
+                          x1={el.x - offsetSel}
+                          y1={el.y + el.height + offsetSel}
+                          x2={el.x + el.width + offsetSel}
+                          y2={el.y + el.height + offsetSel}
+                          stroke="transparent"
+                          strokeWidth={10}
+                          cursor="ns-resize"
                         />
-                        <circle
-                          data-handle-id="se"
-                          cx={el.x + el.width + offsetSel}
-                          cy={el.y + el.height + offsetSel}
-                          r={handleRadius * 0.6}
-                          fill="#3b82f6"
-                          cursor="nwse-resize"
+                        <line
+                          data-handle-id="left"
+                          x1={el.x - offsetSel}
+                          y1={el.y - offsetSel}
+                          x2={el.x - offsetSel}
+                          y2={el.y + el.height + offsetSel}
+                          stroke="transparent"
+                          strokeWidth={10}
+                          cursor="ew-resize"
                         />
-                        <circle
-                          data-handle-id="sw"
-                          cx={el.x - offsetSel}
-                          cy={el.y + el.height + offsetSel}
-                          r={handleRadius * 0.6}
-                          fill="#3b82f6"
-                          cursor="nesw-resize"
+                        <line
+                          data-handle-id="right"
+                          x1={el.x + el.width + offsetSel}
+                          y1={el.y - offsetSel}
+                          x2={el.x + el.width + offsetSel}
+                          y2={el.y + el.height + offsetSel}
+                          stroke="transparent"
+                          strokeWidth={10}
+                          cursor="ew-resize"
                         />
                       </>
                     )}

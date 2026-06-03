@@ -109,6 +109,62 @@ function Lienzo() {
   const clamp = (value: number, min: number, max: number) =>
     Math.max(min, Math.min(max, value));
 
+  const degToRad = (d: number) => (d * Math.PI) / 180;
+
+  const rotatePoint = (
+    x: number,
+    y: number,
+    cx: number,
+    cy: number,
+    angleRad: number,
+  ) => {
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    const dx = x - cx;
+    const dy = y - cy;
+    return {
+      x: cx + dx * cos - dy * sin,
+      y: cy + dx * sin + dy * cos,
+    };
+  };
+
+  const getCornerCanvasPos = (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    degres: number,
+    corner: string,
+    offset: number,
+  ) => {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const θ = degToRad(degres);
+    let lx: number, ly: number;
+    switch (corner) {
+      case "nw":
+        lx = x - offset;
+        ly = y - offset;
+        break;
+      case "ne":
+        lx = x + w + offset;
+        ly = y - offset;
+        break;
+      case "se":
+        lx = x + w + offset;
+        ly = y + h + offset;
+        break;
+      case "sw":
+        lx = x - offset;
+        ly = y + h + offset;
+        break;
+      default:
+        lx = x;
+        ly = y;
+    }
+    return rotatePoint(lx, ly, cx, cy, θ);
+  };
+
   const getMousePosition = (e: React.MouseEvent): { x: number; y: number } => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
@@ -271,6 +327,58 @@ function Lienzo() {
     };
   };
 
+  const resizeRectanguloRotado = (
+    handleType: string,
+    anchorCanvas: { x: number; y: number },
+    mouseCanvas: { x: number; y: number },
+    initialW: number,
+    initialH: number,
+    degres: number,
+    shiftKey: boolean,
+  ) => {
+    const θ = degToRad(degres);
+    const cosθ = Math.cos(θ);
+    const sinθ = Math.sin(θ);
+
+    const cx = (anchorCanvas.x + mouseCanvas.x) / 2;
+    const cy = (anchorCanvas.y + mouseCanvas.y) / 2;
+    const dx = mouseCanvas.x - anchorCanvas.x;
+    const dy = mouseCanvas.y - anchorCanvas.y;
+
+    let w = dx * cosθ + dy * sinθ;
+    let h = -dx * sinθ + dy * cosθ;
+
+    if (shiftKey && initialW > 0 && initialH > 0) {
+      const ratioW = w / initialW;
+      const ratioH = h / initialH;
+      if (Math.abs(ratioW) >= Math.abs(ratioH)) {
+        h = initialH * ratioW;
+      } else {
+        w = initialW * ratioH;
+      }
+    }
+
+    switch (handleType) {
+      case "nw":
+        w = -w;
+        h = -h;
+        break;
+      case "ne":
+        h = -h;
+        break;
+      case "sw":
+        w = -w;
+        break;
+    }
+
+    return {
+      x: cx - Math.abs(w) / 2,
+      y: cy - Math.abs(h) / 2,
+      width: Math.abs(w),
+      height: Math.abs(h),
+    };
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (
       isResizing &&
@@ -286,41 +394,77 @@ function Lienzo() {
 
       switch (el.tipo) {
         case "rectangulo": {
-          const { x: origX, y: origY, width: origW, height: origH } = el;
-          let anchorX: number, anchorY: number;
-          switch (resizeHandle) {
-            case "se":
-              anchorX = origX;
-              anchorY = origY;
-              break;
-            case "nw":
-              anchorX = origX + origW;
-              anchorY = origY + origH;
-              break;
-            case "ne":
-              anchorX = origX;
-              anchorY = origY + origH;
-              break;
-            case "sw":
-              anchorX = origX + origW;
-              anchorY = origY;
-              break;
-            default:
-              anchorX = origX;
-              anchorY = origY;
-          }
-          updated = {
-            ...el,
-            ...resizeRectangulo(
-              anchorX,
-              anchorY,
-              pos.x,
-              pos.y,
+          const {
+            x: origX,
+            y: origY,
+            width: origW,
+            height: origH,
+            degres,
+          } = el;
+          if (degres !== 0) {
+            const anchorMap: Record<string, string> = {
+              se: "nw",
+              nw: "se",
+              ne: "sw",
+              sw: "ne",
+            };
+            const anchor = getCornerCanvasPos(
+              origX,
+              origY,
               origW,
               origH,
-              e.shiftKey,
-            ),
-          };
+              degres,
+              anchorMap[resizeHandle],
+              0,
+            );
+            updated = {
+              ...el,
+              ...resizeRectanguloRotado(
+                resizeHandle,
+                anchor,
+                pos,
+                origW,
+                origH,
+                degres,
+                e.shiftKey,
+              ),
+            };
+          } else {
+            let anchorX: number, anchorY: number;
+            switch (resizeHandle) {
+              case "se":
+                anchorX = origX;
+                anchorY = origY;
+                break;
+              case "nw":
+                anchorX = origX + origW;
+                anchorY = origY + origH;
+                break;
+              case "ne":
+                anchorX = origX;
+                anchorY = origY + origH;
+                break;
+              case "sw":
+                anchorX = origX + origW;
+                anchorY = origY;
+                break;
+              default:
+                anchorX = origX;
+                anchorY = origY;
+            }
+            updated = {
+              ...el,
+              ...resizeRectangulo(
+                anchorX,
+                anchorY,
+                pos.x,
+                pos.y,
+                origW,
+                origH,
+                e.shiftKey,
+              ),
+            };
+          }
           break;
         }
         case "circulo": {
@@ -674,43 +818,43 @@ function Lienzo() {
                           </>
                         );
                       })()}
+                      {sel && (
+                        <>
+                          <circle
+                            data-handle-id="nw"
+                            cx={el.x - offsetSel}
+                            cy={el.y - offsetSel}
+                            r={handleRadius * 0.6}
+                            fill="#3b82f6"
+                            cursor="nwse-resize"
+                          />
+                          <circle
+                            data-handle-id="ne"
+                            cx={el.x + el.width + offsetSel}
+                            cy={el.y - offsetSel}
+                            r={handleRadius * 0.6}
+                            fill="#3b82f6"
+                            cursor="nesw-resize"
+                          />
+                          <circle
+                            data-handle-id="se"
+                            cx={el.x + el.width + offsetSel}
+                            cy={el.y + el.height + offsetSel}
+                            r={handleRadius * 0.6}
+                            fill="#3b82f6"
+                            cursor="nwse-resize"
+                          />
+                          <circle
+                            data-handle-id="sw"
+                            cx={el.x - offsetSel}
+                            cy={el.y + el.height + offsetSel}
+                            r={handleRadius * 0.6}
+                            fill="#3b82f6"
+                            cursor="nesw-resize"
+                          />
+                        </>
+                      )}
                     </g>
-                    {sel && el.degres === 0 && (
-                      <>
-                        <circle
-                          data-handle-id="nw"
-                          cx={el.x - offsetSel}
-                          cy={el.y - offsetSel}
-                          r={handleRadius * 0.6}
-                          fill="#3b82f6"
-                          cursor="nwse-resize"
-                        />
-                        <circle
-                          data-handle-id="ne"
-                          cx={el.x + el.width + offsetSel}
-                          cy={el.y - offsetSel}
-                          r={handleRadius * 0.6}
-                          fill="#3b82f6"
-                          cursor="nesw-resize"
-                        />
-                        <circle
-                          data-handle-id="se"
-                          cx={el.x + el.width + offsetSel}
-                          cy={el.y + el.height + offsetSel}
-                          r={handleRadius * 0.6}
-                          fill="#3b82f6"
-                          cursor="nwse-resize"
-                        />
-                        <circle
-                          data-handle-id="sw"
-                          cx={el.x - offsetSel}
-                          cy={el.y + el.height + offsetSel}
-                          r={handleRadius * 0.6}
-                          fill="#3b82f6"
-                          cursor="nesw-resize"
-                        />
-                      </>
-                    )}
                   </g>
                 );
               case "circulo":

@@ -28,7 +28,16 @@ export interface CircleShape {
   grosor: number;
 }
 
-export type VectorElement = LineaShape | RectShape | CircleShape;
+export interface ImageShape {
+  id: string;
+  tipo: "imagen";
+  x: number; y: number;
+  width: number; height: number;
+  src: string;
+  degres: number;
+}
+
+export type VectorElement = LineaShape | RectShape | CircleShape | ImageShape;
 
 interface LienzoContextType {
   tamano: number;
@@ -46,8 +55,8 @@ interface LienzoContextType {
   setGrosorBorde: (grosor: number) => void;
   herramientaActual: "figuras" | "mover" | "seleccionar";
   setHerramientaActual: (h: "figuras" | "mover" | "seleccionar") => void;
-  figuraTipo: "linea" | "rectangulo" | "circulo";
-  setFiguraTipo: (t: "linea" | "rectangulo" | "circulo") => void;
+  figuraTipo: "linea" | "rectangulo" | "circulo" | "imagen";
+  setFiguraTipo: (t: "linea" | "rectangulo" | "circulo" | "imagen") => void;
   colorFigura: string;
   setColorFigura: (color: string) => void;
   grosorFigura: number;
@@ -60,6 +69,8 @@ interface LienzoContextType {
   addElemento: (el: VectorElement) => void;
   actualizarElemento: (id: string, elemento: VectorElement) => void;
   clearElementos: () => void;
+  imagenCargada: string;
+  setImagenCargada: (src: string) => void;
 }
 
 export const LienzoContext = createContext<LienzoContextType>({
@@ -92,4 +103,6 @@ export const LienzoContext = createContext<LienzoContextType>({
   addElemento: () => {},
   actualizarElemento: () => {},
   clearElementos: () => {},
+  imagenCargada: "",
+  setImagenCargada: () => {},
 });

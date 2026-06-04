@@ -23,7 +23,7 @@ function PanelFiguras() {
     return null;
   }
 
-  const botonClase = (tipo: "linea" | "rectangulo" | "circulo") =>
+  const botonClase = (tipo: "linea" | "rectangulo" | "circulo" | "imagen") =>
     `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
       figuraTipo === tipo
         ? "bg-blue-600 text-white"
@@ -54,6 +54,12 @@ function PanelFiguras() {
           onClick={() => setFiguraTipo("circulo")}
         >
           Círculo
+        </button>
+        <button
+          className={botonClase("imagen")}
+          onClick={() => setFiguraTipo("imagen")}
+        >
+          Imagen
         </button>
       </div>
       <div className="flex items-center gap-3">

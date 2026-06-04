@@ -1,7 +1,6 @@
 import { useContext, useState, useEffect, useRef } from "react";
 import { LienzoContext, VectorElement } from "./ContextDeLienzo";
 import { getHandleConfig } from "../utils/geometry";
-import BotonCargarImagen from "./BotonCargarImagen";
 
 const TAMANO_VISUAL = 1024;
 const FACTOR_LERP = 0.5;
@@ -63,7 +62,16 @@ function Lienzo() {
     initialElement: VectorElement;
   } | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  const [showWarning, setShowWarning] = useState(false);
+  const [warningVisible, setWarningVisible] = useState(false);
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerWarning = () => {
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    setWarningVisible(true);
+    warningTimeoutRef.current = setTimeout(() => {
+      setWarningVisible(false);
+    }, 2000);
+  };
   const [isRotating, setIsRotating] = useState(false);
   const [rotateStart, setRotateStart] = useState<{
     mouseX: number;
@@ -596,8 +604,7 @@ function Lienzo() {
       if (currentLocal.tipo === "imagen") {
         if (currentLocal.width > 0 && currentLocal.height > 0) {
           if (!imagenCargada) {
-            setShowWarning(true);
-            setTimeout(() => setShowWarning(false), 2000);
+            triggerWarning();
           } else {
             addElemento(currentLocal);
           }
@@ -1168,28 +1175,27 @@ function Lienzo() {
             </div>
           );
         })()}
-      {showWarning && (
-        <div
-          style={{
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            background: "rgba(0,0,0,0.85)",
-            color: "white",
-            padding: "20px 32px",
-            borderRadius: 12,
-            fontSize: 20,
-            fontWeight: 600,
-            zIndex: 9999,
-            pointerEvents: "none",
-            fontFamily: "monospace",
-          }}
-        >
-          Cargue una imagen primero
-        </div>
-      )}
-      <BotonCargarImagen />
+      <div
+        style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          background: "rgba(0,0,0,0.85)",
+          color: "white",
+          padding: "20px 32px",
+          borderRadius: 12,
+          fontSize: 20,
+          fontWeight: 600,
+          zIndex: 9999,
+          pointerEvents: "none",
+          fontFamily: "monospace",
+          opacity: warningVisible ? 1 : 0,
+          transition: "opacity 800ms ease-in-out",
+        }}
+      >
+        Cargue una imagen primero
+      </div>
     </div>
   );
 }

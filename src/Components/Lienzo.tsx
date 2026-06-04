@@ -31,6 +31,7 @@ function Lienzo() {
     actualizarElemento,
     selectedElementId,
     setSelectedElementId,
+    imagenCargada,
   } = useContext(LienzoContext);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -61,6 +62,16 @@ function Lienzo() {
     initialElement: VectorElement;
   } | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [warningVisible, setWarningVisible] = useState(false);
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerWarning = () => {
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    setWarningVisible(true);
+    warningTimeoutRef.current = setTimeout(() => {
+      setWarningVisible(false);
+    }, 2000);
+  };
   const [isRotating, setIsRotating] = useState(false);
   const [rotateStart, setRotateStart] = useState<{
     mouseX: number;
@@ -232,6 +243,18 @@ function Lienzo() {
             grosor: grosorFigura,
           };
           break;
+        case "imagen":
+          elem = {
+            id,
+            tipo: "imagen",
+            x: pos.x,
+            y: pos.y,
+            width: 0,
+            height: 0,
+            src: imagenCargada,
+            degres: 0,
+          };
+          break;
       }
       setCurrentLocal(elem);
       setDrawStart(pos);
@@ -245,7 +268,7 @@ function Lienzo() {
           const id = parentEl?.getAttribute("data-element-id") ?? null;
           if (id) {
             const element = elementos.find((el) => el.id === id);
-            if (element && element.tipo === "rectangulo") {
+            if (element && (element.tipo === "rectangulo" || element.tipo === "imagen")) {
               const pos = getMousePosition(e);
               setSelectedElementId(id);
               setIsRotating(true);
@@ -393,6 +416,7 @@ function Lienzo() {
       let updated: VectorElement;
 
       switch (el.tipo) {
+        case "imagen":
         case "rectangulo": {
           const {
             x: origX,
@@ -504,7 +528,7 @@ function Lienzo() {
       const newDegres =
         (((rotateStart.initialDegres + deltaDeg) % 360) + 360) % 360;
       const el = elementos.find((e) => e.id === selectedElementId);
-      if (el && el.tipo === "rectangulo") {
+      if (el && (el.tipo === "rectangulo" || el.tipo === "imagen")) {
         actualizarElemento(el.id, { ...el, degres: newDegres });
       }
       return;
@@ -536,6 +560,7 @@ function Lienzo() {
             y2: original.y2 + dy,
           };
           break;
+        case "imagen":
         case "rectangulo":
           updated = { ...original, x: original.x + dx, y: original.y + dy };
           break;
@@ -555,6 +580,7 @@ function Lienzo() {
         case "linea":
           setCurrentLocal({ ...currentLocal, x2: pos.x, y2: pos.y });
           break;
+        case "imagen":
         case "rectangulo": {
           const x = Math.min(drawStart.x, pos.x);
           const y = Math.min(drawStart.y, pos.y);
@@ -575,16 +601,26 @@ function Lienzo() {
 
   const finalizeDrawing = () => {
     if (currentLocal) {
-      const valid =
-        (currentLocal.tipo === "linea" &&
-          (currentLocal.x1 !== currentLocal.x2 ||
-            currentLocal.y1 !== currentLocal.y2)) ||
-        (currentLocal.tipo === "rectangulo" &&
-          currentLocal.width > 0 &&
-          currentLocal.height > 0) ||
-        (currentLocal.tipo === "circulo" && currentLocal.r > 0);
-      if (valid) {
-        addElemento(currentLocal);
+      if (currentLocal.tipo === "imagen") {
+        if (currentLocal.width > 0 && currentLocal.height > 0) {
+          if (!imagenCargada) {
+            triggerWarning();
+          } else {
+            addElemento(currentLocal);
+          }
+        }
+      } else {
+        const valid =
+          (currentLocal.tipo === "linea" &&
+            (currentLocal.x1 !== currentLocal.x2 ||
+              currentLocal.y1 !== currentLocal.y2)) ||
+          (currentLocal.tipo === "rectangulo" &&
+            currentLocal.width > 0 &&
+            currentLocal.height > 0) ||
+          (currentLocal.tipo === "circulo" && currentLocal.r > 0);
+        if (valid) {
+          addElemento(currentLocal);
+        }
       }
     }
     setCurrentLocal(null);
@@ -857,6 +893,128 @@ function Lienzo() {
                     </g>
                   </g>
                 );
+              case "imagen":
+                return (
+                  <g key={el.id} data-element-id={el.id}>
+                    <g
+                      transform={`rotate(${el.degres}, ${el.x + el.width / 2}, ${el.y + el.height / 2})`}
+                    >
+                      <image
+                        href={el.src}
+                        x={el.x}
+                        y={el.y}
+                        width={el.width}
+                        height={el.height}
+                        preserveAspectRatio="none"
+                      />
+                      {sel && (
+                        <rect
+                          x={el.x - offsetSel}
+                          y={el.y - offsetSel}
+                          width={el.width + offsetSel * 2}
+                          height={el.height + offsetSel * 2}
+                          stroke="#3b82f6"
+                          strokeWidth={swSel - 0.5}
+                          fill="none"
+                          pointerEvents="none"
+                        />
+                      )}
+                      {sel && (() => {
+                        const canvasCX = tamano / 2;
+                        const canvasCY = tamano / 2;
+                        const rectCX = el.x + el.width / 2;
+                        const rectCY = el.y + el.height / 2;
+                        const targetAngle = Math.atan2(canvasCY - rectCY, canvasCX - rectCX) * 180 / Math.PI;
+                        const angleDiff = (a: number, b: number) => ((a - b) % 360 + 540) % 360 - 180;
+                        const sides = [
+                          { name: "bottom", angle: el.degres + 90 },
+                          { name: "right", angle: el.degres },
+                          { name: "top", angle: el.degres - 90 },
+                          { name: "left", angle: el.degres + 180 },
+                        ];
+                        let closest = sides[0];
+                        let minDiff = Math.abs(angleDiff(targetAngle, closest.angle));
+                        for (let i = 1; i < sides.length; i++) {
+                          const diff = Math.abs(angleDiff(targetAngle, sides[i].angle));
+                          if (diff < minDiff) {
+                            minDiff = diff;
+                            closest = sides[i];
+                          }
+                        }
+                        const dist = rotationHandleDistance;
+                        let lx1 = 0, ly1 = 0, lx2 = 0, ly2 = 0, hx = 0, hy = 0;
+                        switch (closest.name) {
+                          case "bottom":
+                            lx1 = lx2 = el.x + el.width / 2;
+                            ly1 = el.y + el.height + offsetSel;
+                            ly2 = ly1 + dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                          case "right":
+                            lx1 = el.x + el.width + offsetSel;
+                            ly1 = ly2 = el.y + el.height / 2;
+                            lx2 = lx1 + dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                          case "top":
+                            lx1 = lx2 = el.x + el.width / 2;
+                            ly1 = el.y - offsetSel;
+                            ly2 = ly1 - dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                          case "left":
+                            lx1 = el.x - offsetSel;
+                            ly1 = ly2 = el.y + el.height / 2;
+                            lx2 = lx1 - dist;
+                            hx = lx2; hy = ly2;
+                            break;
+                        }
+                        return (
+                          <>
+                            <line x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="#10b981" strokeWidth={rotationLineWidth} />
+                            <circle data-handle-id="rotate" cx={hx} cy={hy} r={handleRadius * 0.5} fill="#10b981" cursor="grab" />
+                          </>
+                        );
+                      })()}
+                      {sel && (
+                        <>
+                          <circle
+                            data-handle-id="nw"
+                            cx={el.x - offsetSel}
+                            cy={el.y - offsetSel}
+                            r={handleRadius * 0.6}
+                            fill="#3b82f6"
+                            cursor="nwse-resize"
+                          />
+                          <circle
+                            data-handle-id="ne"
+                            cx={el.x + el.width + offsetSel}
+                            cy={el.y - offsetSel}
+                            r={handleRadius * 0.6}
+                            fill="#3b82f6"
+                            cursor="nesw-resize"
+                          />
+                          <circle
+                            data-handle-id="se"
+                            cx={el.x + el.width + offsetSel}
+                            cy={el.y + el.height + offsetSel}
+                            r={handleRadius * 0.6}
+                            fill="#3b82f6"
+                            cursor="nwse-resize"
+                          />
+                          <circle
+                            data-handle-id="sw"
+                            cx={el.x - offsetSel}
+                            cy={el.y + el.height + offsetSel}
+                            r={handleRadius * 0.6}
+                            fill="#3b82f6"
+                            cursor="nesw-resize"
+                          />
+                        </>
+                      )}
+                    </g>
+                  </g>
+                );
               case "circulo":
                 return (
                   <g key={el.id} data-element-id={el.id}>
@@ -947,6 +1105,18 @@ function Lienzo() {
               fill="none"
             />
           )}
+          {currentLocal?.tipo === "imagen" && (
+            <rect
+              x={currentLocal.x}
+              y={currentLocal.y}
+              width={currentLocal.width}
+              height={currentLocal.height}
+              stroke="#3b82f6"
+              strokeWidth={2}
+              fill="none"
+              strokeDasharray="4,4"
+            />
+          )}
           {currentLocal?.tipo === "circulo" && (
             <circle
               cx={currentLocal.cx}
@@ -966,10 +1136,11 @@ function Lienzo() {
             : null;
           if (!selEl) return null;
           let texto = "";
-          if (isRotating && selEl.tipo === "rectangulo") {
+          if (isRotating && (selEl.tipo === "rectangulo" || selEl.tipo === "imagen")) {
             texto = `${Math.round(selEl.degres)}°`;
           } else {
             switch (selEl.tipo) {
+              case "imagen":
               case "rectangulo":
                 texto = `${Math.round(selEl.width)} X ${Math.round(selEl.height)}`;
                 break;
@@ -1004,6 +1175,27 @@ function Lienzo() {
             </div>
           );
         })()}
+      <div
+        style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          background: "rgba(0,0,0,0.85)",
+          color: "white",
+          padding: "20px 32px",
+          borderRadius: 12,
+          fontSize: 20,
+          fontWeight: 600,
+          zIndex: 9999,
+          pointerEvents: "none",
+          fontFamily: "monospace",
+          opacity: warningVisible ? 1 : 0,
+          transition: "opacity 800ms ease-in-out",
+        }}
+      >
+        Cargue una imagen primero
+      </div>
     </div>
   );
 }

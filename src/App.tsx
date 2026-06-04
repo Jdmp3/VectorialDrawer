@@ -18,9 +18,10 @@ function App() {
   const [grosorBorde, setGrosorBorde] = useState(0.1);
   const [herramientaActual, setHerramientaActual] = useState<"figuras" | "mover" | "seleccionar">("mover");
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [figuraTipo, setFiguraTipo] = useState<"linea" | "rectangulo" | "circulo">("linea");
+  const [figuraTipo, setFiguraTipo] = useState<"linea" | "rectangulo" | "circulo" | "imagen">("linea");
   const [colorFigura, setColorFigura] = useState("#000000");
   const [grosorFigura, setGrosorFigura] = useState(2);
+  const [imagenCargada, setImagenCargada] = useState("");
   const [elementos, setElementos] = useState<VectorElement[]>([]);
 
   useEffect(() => {
@@ -78,6 +79,8 @@ function App() {
         addElemento,
         actualizarElemento,
         clearElementos,
+        imagenCargada,
+        setImagenCargada,
       }}
     >
       <section className="w-full h-screen bg-gray-700 overflow-hidden">

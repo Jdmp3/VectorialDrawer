@@ -69,6 +69,7 @@ interface LienzoContextType {
   addElemento: (el: VectorElement) => void;
   actualizarElemento: (id: string, elemento: VectorElement) => void;
   clearElementos: () => void;
+  setElementos: (el: VectorElement[]) => void;
   imagenCargada: string;
   setImagenCargada: (src: string) => void;
 }
@@ -103,6 +104,7 @@ export const LienzoContext = createContext<LienzoContextType>({
   addElemento: () => {},
   actualizarElemento: () => {},
   clearElementos: () => {},
+  setElementos: () => {},
   imagenCargada: "",
   setImagenCargada: () => {},
 });

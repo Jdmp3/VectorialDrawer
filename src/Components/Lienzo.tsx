@@ -34,6 +34,18 @@ function Lienzo() {
     imagenCargada,
   } = useContext(LienzoContext);
 
+  useEffect(() => {
+    let maxId = 0;
+    for (const el of elementos) {
+      const m = el.id.match(/^fig-(\d+)$/);
+      if (m) {
+        const num = parseInt(m[1], 10);
+        if (num > maxId) maxId = num;
+      }
+    }
+    if (maxId > 0) nextId = maxId + 1;
+  }, [elementos]);
+
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({
     x: 0,
@@ -689,6 +701,7 @@ function Lienzo() {
     <div className="fixed inset-0 flex items-center justify-center bg-zinc-800">
       <svg
         ref={svgRef}
+        data-lienzo-svg
         width={TAMANO_VISUAL}
         height={TAMANO_VISUAL}
         viewBox={`${centeredOffset.x} ${centeredOffset.y} ${viewBoxSize} ${viewBoxSize}`}

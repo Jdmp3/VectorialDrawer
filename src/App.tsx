@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Prompteador from "./Components/PromptDeLienzo";
+import AnimacionMorphing from "./Components/AnimacionMorphing";
 import PromptGuardarCargar from "./Components/PromptGuardarCargar";
 import PromptAdvertenciaCambios from "./Components/PromptAdvertenciaCambios";
 import Lienzo from "./Components/Lienzo";
@@ -155,10 +156,13 @@ function App() {
             }}
           />
         )}
+        <AnimacionMorphing mostrar={mostrarPrompt} lado="izquierda" />
+        {mostrarPrompt && <div className="fixed inset-0 z-45" />}
         <Prompteador
           mostrarPrompt={mostrarPrompt}
           setMostrarPrompt={setMostrarPrompt}
         />
+        <AnimacionMorphing mostrar={mostrarPrompt} lado="derecha" />
         <PromptGuardarCargar
           mostrar={mostrarPromptGuardarCargar}
           setMostrar={setMostrarPromptGuardarCargar}

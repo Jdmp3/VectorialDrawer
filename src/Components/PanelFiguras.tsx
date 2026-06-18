@@ -54,7 +54,7 @@ function PanelFiguras() {
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button
           className={botonClase("linea")}
           onClick={() => setFiguraTipo("linea")}

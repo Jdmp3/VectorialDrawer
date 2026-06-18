@@ -45,6 +45,7 @@ interface LienzoContextType {
   colorLienzo: string;
   setColorLienzo: (color: string) => void;
   mostrarPrompt: boolean;
+  mostrarPromptGuardarCargar: boolean;
   offsetReal: { x: number; y: number };
   offsetRender: { x: number; y: number };
   setOffsetReal: (offset: { x: number; y: number }) => void;
@@ -66,11 +67,16 @@ interface LienzoContextType {
   setCurrentElement: (el: VectorElement | null) => void;
   selectedElementId: string | null;
   setSelectedElementId: (id: string | null) => void;
+  multiSelectedIds: string[];
+  setMultiSelectedIds: (ids: string[]) => void;
   addElemento: (el: VectorElement) => void;
   actualizarElemento: (id: string, elemento: VectorElement) => void;
   clearElementos: () => void;
+  setElementos: (el: VectorElement[]) => void;
   imagenCargada: string;
   setImagenCargada: (src: string) => void;
+  clipboardElements: VectorElement[];
+  setClipboardElements: (els: VectorElement[]) => void;
 }
 
 export const LienzoContext = createContext<LienzoContextType>({
@@ -79,6 +85,7 @@ export const LienzoContext = createContext<LienzoContextType>({
   colorLienzo: "#3d3d3d",
   setColorLienzo: () => {},
   mostrarPrompt: true,
+  mostrarPromptGuardarCargar: false,
   offsetReal: { x: 0, y: 0 },
   offsetRender: { x: 0, y: 0 },
   setOffsetReal: () => {},
@@ -100,9 +107,14 @@ export const LienzoContext = createContext<LienzoContextType>({
   setCurrentElement: () => {},
   selectedElementId: null,
   setSelectedElementId: () => {},
+  multiSelectedIds: [],
+  setMultiSelectedIds: () => {},
   addElemento: () => {},
   actualizarElemento: () => {},
   clearElementos: () => {},
+  setElementos: () => {},
   imagenCargada: "",
   setImagenCargada: () => {},
+  clipboardElements: [],
+  setClipboardElements: () => {},
 });

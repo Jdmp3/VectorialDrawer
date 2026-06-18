@@ -8,6 +8,7 @@ import ZoomBar from "./Components/ZoomBar";
 import BotonGrosor from "./Components/BotonGrosor";
 import Toolbar from "./Components/Toolbar";
 import PanelFiguras from "./Components/PanelFiguras";
+import PanelSeleccion from "./Components/PanelSeleccion";
 import MenuHamburguesa from "./Components/MenuHamburguesa";
 import { LienzoContext, VectorElement } from "./Components/ContextDeLienzo";
 
@@ -27,6 +28,7 @@ function App() {
   const [colorFigura, setColorFigura] = useState("#000000");
   const [grosorFigura, setGrosorFigura] = useState(2);
   const [imagenCargada, setImagenCargada] = useState("");
+  const [clipboardElement, setClipboardElement] = useState<VectorElement | null>(null);
   const [elementos, setElementos] = useState<VectorElement[]>([]);
   const [elementosGuardados, setElementosGuardados] = useState<VectorElement[]>([]);
   const [mostrarAdvertencia, setMostrarAdvertencia] = useState(false);
@@ -106,12 +108,15 @@ function App() {
         setElementos,
         imagenCargada,
         setImagenCargada,
+        clipboardElement,
+        setClipboardElement,
       }}
     >
       <section className="w-full h-screen bg-gray-700 overflow-hidden">
         <Lienzo />
         <Toolbar />
         <PanelFiguras />
+        <PanelSeleccion />
         <ZoomBar />
         <BotonGrosor />
         {!mostrarPrompt && !mostrarPromptGuardarCargar && (

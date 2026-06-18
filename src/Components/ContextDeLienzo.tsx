@@ -72,6 +72,8 @@ interface LienzoContextType {
   setElementos: (el: VectorElement[]) => void;
   imagenCargada: string;
   setImagenCargada: (src: string) => void;
+  clipboardElement: VectorElement | null;
+  setClipboardElement: (el: VectorElement | null) => void;
 }
 
 export const LienzoContext = createContext<LienzoContextType>({
@@ -107,4 +109,6 @@ export const LienzoContext = createContext<LienzoContextType>({
   setElementos: () => {},
   imagenCargada: "",
   setImagenCargada: () => {},
+  clipboardElement: null,
+  setClipboardElement: () => {},
 });

@@ -4,18 +4,27 @@ interface Props {
 }
 
 function AnimacionMorphing({ mostrar, lado }: Props) {
-  const posicionLeft = lado === "izquierda" ? "left-[calc(50%-380px)]" : "left-[calc(50%+316px)]";
+  const posicionLeft =
+    lado === "izquierda" ? "left-[calc(50%-380px)]" : "left-[calc(50%+316px)]";
 
   return (
     <div
       className={`fixed ${posicionLeft} top-1/2 -translate-y-1/2 w-16 h-16 z-40 pointer-events-none transition-opacity`}
       style={{
-        opacity: mostrar ? 0.6 : 0,
+        opacity: mostrar ? 0.1 : 0,
         transitionDuration: mostrar ? "80ms" : "600ms",
         transitionTimingFunction: mostrar ? "ease-out" : "ease-in-out",
       }}
     >
-      <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-amber-50 w-full h-full">
+      <svg
+        viewBox="0 0 80 80"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-amber-50 w-full h-full"
+      >
         <path>
           <animate
             attributeName="d"

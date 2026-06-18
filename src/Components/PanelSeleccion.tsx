@@ -5,73 +5,80 @@ function PanelSeleccion() {
   const {
     herramientaActual,
     selectedElementId,
+    multiSelectedIds,
     elementos,
-    clipboardElement,
-    setClipboardElement,
-    addElemento,
+    mostrarPrompt,
+    mostrarPromptGuardarCargar,
+    clipboardElements,
+    setClipboardElements,
+    setElementos,
+    setMultiSelectedIds,
+    setSelectedElementId,
   } = useContext(LienzoContext);
 
-  if (herramientaActual !== "seleccionar" || !selectedElementId) {
-    return null;
-  }
+  if (herramientaActual !== "seleccionar" || mostrarPrompt || mostrarPromptGuardarCargar) return null;
 
-  const elementoSeleccionado = elementos.find(el => el.id === selectedElementId);
-  if (!elementoSeleccionado) return null;
+  const idsActivos = multiSelectedIds.length > 0
+    ? multiSelectedIds
+    : selectedElementId
+      ? [selectedElementId]
+      : [];
+  const elementosSeleccionados = elementos.filter(el => idsActivos.includes(el.id));
+  const haySeleccion = elementosSeleccionados.length > 0;
+  const hayClipboard = clipboardElements.length > 0;
+
+  if (!haySeleccion && !hayClipboard) return null;
 
   const handleCopiar = () => {
-    setClipboardElement(elementoSeleccionado);
+    setClipboardElements(elementosSeleccionados.map(el => ({ ...el })));
   };
 
   const handlePegar = () => {
-    if (!clipboardElement) return;
+    if (clipboardElements.length === 0) return;
 
-    const nuevoElemento = JSON.parse(JSON.stringify(clipboardElement)) as VectorElement;
-    nuevoElemento.id = crypto.randomUUID();
+    const nuevos = clipboardElements.map(el => {
+      const clon = JSON.parse(JSON.stringify(el)) as VectorElement;
+      clon.id = crypto.randomUUID();
+      switch (clon.tipo) {
+        case "linea":
+          clon.x1 += 20;
+          clon.x2 += 20;
+          break;
+        case "rectangulo":
+        case "imagen":
+          clon.x += 20;
+          break;
+        case "circulo":
+          clon.cx += 20;
+          break;
+      }
+      return clon;
+    });
 
-    switch (nuevoElemento.tipo) {
-      case "linea":
-        nuevoElemento.x1 += 20;
-        nuevoElemento.y1 += 20;
-        nuevoElemento.x2 += 20;
-        nuevoElemento.y2 += 20;
-        break;
-      case "rectangulo":
-      case "imagen":
-        nuevoElemento.x += 20;
-        nuevoElemento.y += 20;
-        break;
-      case "circulo":
-        nuevoElemento.cx += 20;
-        nuevoElemento.cy += 20;
-        break;
-    }
-
-    addElemento(nuevoElemento);
+    setElementos([...elementos, ...nuevos]);
+    setSelectedElementId(null);
+    setMultiSelectedIds(nuevos.map(el => el.id));
   };
-
-  const botonClase = (tipo: "copiar" | "pegar") =>
-    `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-      tipo === "pegar" && !clipboardElement
-        ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-        : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
-    }`;
 
   return (
     <div className="fixed right-40 top-20 bg-zinc-900 p-4 rounded-xl shadow-lg z-50 flex flex-col gap-3">
       <div className="flex gap-2">
-        <button
-          className={botonClase("copiar")}
-          onClick={handleCopiar}
-        >
-          Copiar
-        </button>
-        <button
-          className={botonClase("pegar")}
-          onClick={handlePegar}
-          disabled={!clipboardElement}
-        >
-          Pegar
-        </button>
+        {haySeleccion && (
+          <button
+            onClick={handleCopiar}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
+          >
+            Copiar
+          </button>
+        )}
+        {hayClipboard && (
+          <button
+            onClick={handlePegar}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
+          >
+            Pegar
+          </button>
+        )}
       </div>
     </div>
   );

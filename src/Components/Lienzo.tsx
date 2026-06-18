@@ -31,6 +31,8 @@ function Lienzo() {
     actualizarElemento,
     selectedElementId,
     setSelectedElementId,
+    multiSelectedIds,
+    setMultiSelectedIds,
     imagenCargada,
   } = useContext(LienzoContext);
 
@@ -91,6 +93,15 @@ function Lienzo() {
     centerX: number;
     centerY: number;
     initialDegres: number;
+  } | null>(null);
+  const [isBoxSelecting, setIsBoxSelecting] = useState(false);
+  const [boxSelectStart, setBoxSelectStart] = useState<{ x: number; y: number } | null>(null);
+  const [boxSelectRect, setBoxSelectRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [isMultiDragging, setIsMultiDragging] = useState(false);
+  const [multiDragStart, setMultiDragStart] = useState<{
+    mouseX: number;
+    mouseY: number;
+    initialPositions: VectorElement[];
   } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -188,6 +199,38 @@ function Lienzo() {
     return rotatePoint(lx, ly, cx, cy, θ);
   };
 
+  const isPointInRect = (
+    px: number, py: number,
+    rx: number, ry: number, rw: number, rh: number,
+  ) => px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
+
+  const shouldSelectElement = (el: VectorElement, rect: { x: number; y: number; w: number; h: number }) => {
+    const { x: rx, y: ry, w: rw, h: rh } = rect;
+    switch (el.tipo) {
+      case "linea":
+        return (
+          isPointInRect(el.x1, el.y1, rx, ry, rw, rh) ||
+          isPointInRect(el.x2, el.y2, rx, ry, rw, rh)
+        );
+      case "rectangulo":
+      case "imagen":
+        return (
+          isPointInRect(el.x, el.y, rx, ry, rw, rh) ||
+          isPointInRect(el.x + el.width, el.y, rx, ry, rw, rh) ||
+          isPointInRect(el.x, el.y + el.height, rx, ry, rw, rh) ||
+          isPointInRect(el.x + el.width, el.y + el.height, rx, ry, rw, rh)
+        );
+      case "circulo":
+        return (
+          isPointInRect(el.cx, el.cy, rx, ry, rw, rh) ||
+          isPointInRect(el.cx - el.r, el.cy, rx, ry, rw, rh) ||
+          isPointInRect(el.cx + el.r, el.cy, rx, ry, rw, rh) ||
+          isPointInRect(el.cx, el.cy - el.r, rx, ry, rw, rh) ||
+          isPointInRect(el.cx, el.cy + el.r, rx, ry, rw, rh)
+        );
+    }
+  };
+
   const getMousePosition = (e: React.MouseEvent): { x: number; y: number } => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
@@ -273,6 +316,58 @@ function Lienzo() {
       setIsDrawing(true);
     } else if (herramientaActual === "seleccionar") {
       const target = e.target as SVGElement;
+      const clickedId =
+        target.closest("[data-element-id]")?.getAttribute("data-element-id") ?? null;
+
+      if (e.shiftKey) {
+        if (clickedId) {
+          const currentSet = new Set(multiSelectedIds);
+          if (selectedElementId) currentSet.add(selectedElementId);
+          if (currentSet.has(clickedId)) {
+            currentSet.delete(clickedId);
+          } else {
+            currentSet.add(clickedId);
+          }
+          setMultiSelectedIds(Array.from(currentSet));
+          setSelectedElementId(null);
+        }
+        return;
+      }
+
+      if (multiSelectedIds.length > 0) {
+        if (clickedId && multiSelectedIds.includes(clickedId)) {
+          const pos = getMousePosition(e);
+          const initialPositions = elementos
+            .filter(el => multiSelectedIds.includes(el.id))
+            .map(el => ({ ...el }));
+          setIsMultiDragging(true);
+          setMultiDragStart({ mouseX: pos.x, mouseY: pos.y, initialPositions });
+          return;
+        }
+        setMultiSelectedIds([]);
+        if (clickedId) {
+          const element = elementos.find((el) => el.id === clickedId);
+          if (element) {
+            setSelectedElementId(clickedId);
+            const pos = getMousePosition(e);
+            setIsDraggingElement(true);
+            setDragElementStart({
+              mouseX: pos.x,
+              mouseY: pos.y,
+              initialPos: { ...element },
+            });
+            return;
+          }
+        }
+        setSelectedElementId(null);
+        setMultiSelectedIds([]);
+        const pos = getMousePosition(e);
+        setIsBoxSelecting(true);
+        setBoxSelectStart(pos);
+        setBoxSelectRect({ x: pos.x, y: pos.y, w: 0, h: 0 });
+        return;
+      }
+
       const handleId = target.getAttribute("data-handle-id");
       if (handleId) {
         if (handleId === "rotate") {
@@ -315,13 +410,11 @@ function Lienzo() {
         }
         return;
       }
-      const id =
-        target.closest("[data-element-id]")?.getAttribute("data-element-id") ??
-        null;
-      setSelectedElementId(id);
-      if (id) {
-        const element = elementos.find((el) => el.id === id);
+
+      if (clickedId) {
+        const element = elementos.find((el) => el.id === clickedId);
         if (element) {
+          setSelectedElementId(clickedId);
           const pos = getMousePosition(e);
           setIsDraggingElement(true);
           setDragElementStart({
@@ -329,8 +422,14 @@ function Lienzo() {
             mouseY: pos.y,
             initialPos: { ...element },
           });
+          return;
         }
       }
+
+      const pos = getMousePosition(e);
+      setIsBoxSelecting(true);
+      setBoxSelectStart(pos);
+      setBoxSelectRect({ x: pos.x, y: pos.y, w: 0, h: 0 });
     }
   };
 
@@ -582,6 +681,36 @@ function Lienzo() {
       }
       actualizarElemento(original.id, updated);
     } else if (
+      isMultiDragging &&
+      multiDragStart &&
+      herramientaActual === "seleccionar"
+    ) {
+      const pos = getMousePosition(e);
+      const dx = pos.x - multiDragStart.mouseX;
+      const dy = pos.y - multiDragStart.mouseY;
+      for (const original of multiDragStart.initialPositions) {
+        let updated: VectorElement;
+        switch (original.tipo) {
+          case "linea":
+            updated = {
+              ...original,
+              x1: original.x1 + dx,
+              y1: original.y1 + dy,
+              x2: original.x2 + dx,
+              y2: original.y2 + dy,
+            };
+            break;
+          case "imagen":
+          case "rectangulo":
+            updated = { ...original, x: original.x + dx, y: original.y + dy };
+            break;
+          case "circulo":
+            updated = { ...original, cx: original.cx + dx, cy: original.cy + dy };
+            break;
+        }
+        actualizarElemento(original.id, updated);
+      }
+    } else if (
       isDrawing &&
       herramientaActual === "figuras" &&
       currentLocal &&
@@ -608,6 +737,13 @@ function Lienzo() {
           break;
         }
       }
+    } else if (isBoxSelecting && boxSelectStart) {
+      const pos = getMousePosition(e);
+      const x = Math.min(boxSelectStart.x, pos.x);
+      const y = Math.min(boxSelectStart.y, pos.y);
+      const w = Math.abs(pos.x - boxSelectStart.x);
+      const h = Math.abs(pos.y - boxSelectStart.y);
+      setBoxSelectRect({ x, y, w, h });
     }
   };
 
@@ -661,6 +797,23 @@ function Lienzo() {
       finalizeDrawing();
     }
     if (isDraggingElement) setIsDraggingElement(false);
+    if (isMultiDragging) {
+      setIsMultiDragging(false);
+      setMultiDragStart(null);
+    }
+    if (isBoxSelecting && boxSelectRect) {
+      const ids: string[] = [];
+      for (const el of elementos) {
+        if (shouldSelectElement(el, boxSelectRect)) {
+          ids.push(el.id);
+        }
+      }
+      setMultiSelectedIds(ids);
+      if (ids.length === 0) setSelectedElementId(null);
+      setIsBoxSelecting(false);
+      setBoxSelectStart(null);
+      setBoxSelectRect(null);
+    }
   };
 
   const handleMouseLeave = () => {
@@ -672,6 +825,15 @@ function Lienzo() {
     if (isDragging) setIsDragging(false);
     if (isDrawing) finalizeDrawing();
     if (isDraggingElement) setIsDraggingElement(false);
+    if (isMultiDragging) {
+      setIsMultiDragging(false);
+      setMultiDragStart(null);
+    }
+    if (isBoxSelecting) {
+      setIsBoxSelecting(false);
+      setBoxSelectStart(null);
+      setBoxSelectRect(null);
+    }
   };
 
   const esColorClaro = (hex: string): boolean => {
@@ -694,7 +856,7 @@ function Lienzo() {
     if (herramientaActual === "mover") return isDragging ? "grabbing" : "grab";
     if (herramientaActual === "figuras") return "crosshair";
     if (herramientaActual === "seleccionar")
-      return isDraggingElement ? "grabbing" : "default";
+      return isDraggingElement || isMultiDragging ? "grabbing" : "default";
   };
 
   return (
@@ -740,7 +902,8 @@ function Lienzo() {
         />
         <g clipPath="url(#lienzoClip)">
           {elementos.map((el) => {
-            const sel = el.id === selectedElementId;
+            const sel = el.id === selectedElementId || multiSelectedIds.includes(el.id);
+            const showHandles = el.id === selectedElementId && multiSelectedIds.length === 0;
             const {
               offset: offsetSel,
               strokeWidth: swSel,
@@ -761,7 +924,7 @@ function Lienzo() {
                       strokeWidth={el.grosor}
                       strokeLinecap="round"
                     />
-                    {sel && (
+                    {showHandles && (
                       <g>
                         <circle
                           data-handle-id="p1"
@@ -810,7 +973,7 @@ function Lienzo() {
                           pointerEvents="none"
                         />
                       )}
-                      {sel && (() => {
+                      {showHandles && (() => {
                         const canvasCX = tamano / 2;
                         const canvasCY = tamano / 2;
                         const rectCX = el.x + el.width / 2;
@@ -867,7 +1030,7 @@ function Lienzo() {
                           </>
                         );
                       })()}
-                      {sel && (
+                      {showHandles && (
                         <>
                           <circle
                             data-handle-id="nw"
@@ -932,7 +1095,7 @@ function Lienzo() {
                           pointerEvents="none"
                         />
                       )}
-                      {sel && (() => {
+                      {showHandles && (() => {
                         const canvasCX = tamano / 2;
                         const canvasCY = tamano / 2;
                         const rectCX = el.x + el.width / 2;
@@ -989,7 +1152,7 @@ function Lienzo() {
                           </>
                         );
                       })()}
-                      {sel && (
+                      {showHandles && (
                         <>
                           <circle
                             data-handle-id="nw"
@@ -1057,38 +1220,42 @@ function Lienzo() {
                               fill="none"
                               pointerEvents="none"
                             />
-                            <circle
-                              data-handle-id="nw"
-                              cx={left}
-                              cy={top}
-                              r={handleRadius * 0.6}
-                              fill="#3b82f6"
-                              cursor="nwse-resize"
-                            />
-                            <circle
-                              data-handle-id="ne"
-                              cx={left + side}
-                              cy={top}
-                              r={handleRadius * 0.6}
-                              fill="#3b82f6"
-                              cursor="nesw-resize"
-                            />
-                            <circle
-                              data-handle-id="se"
-                              cx={left + side}
-                              cy={top + side}
-                              r={handleRadius * 0.6}
-                              fill="#3b82f6"
-                              cursor="nwse-resize"
-                            />
-                            <circle
-                              data-handle-id="sw"
-                              cx={left}
-                              cy={top + side}
-                              r={handleRadius * 0.6}
-                              fill="#3b82f6"
-                              cursor="nesw-resize"
-                            />
+                            {showHandles && (
+                              <>
+                                <circle
+                                  data-handle-id="nw"
+                                  cx={left}
+                                  cy={top}
+                                  r={handleRadius * 0.6}
+                                  fill="#3b82f6"
+                                  cursor="nwse-resize"
+                                />
+                                <circle
+                                  data-handle-id="ne"
+                                  cx={left + side}
+                                  cy={top}
+                                  r={handleRadius * 0.6}
+                                  fill="#3b82f6"
+                                  cursor="nesw-resize"
+                                />
+                                <circle
+                                  data-handle-id="se"
+                                  cx={left + side}
+                                  cy={top + side}
+                                  r={handleRadius * 0.6}
+                                  fill="#3b82f6"
+                                  cursor="nwse-resize"
+                                />
+                                <circle
+                                  data-handle-id="sw"
+                                  cx={left}
+                                  cy={top + side}
+                                  r={handleRadius * 0.6}
+                                  fill="#3b82f6"
+                                  cursor="nesw-resize"
+                                />
+                              </>
+                            )}
                           </g>
                         );
                       })()}
@@ -1096,6 +1263,18 @@ function Lienzo() {
                 );
             }
           })}
+          {boxSelectRect && (
+            <rect
+              x={boxSelectRect.x}
+              y={boxSelectRect.y}
+              width={boxSelectRect.w}
+              height={boxSelectRect.h}
+              fill="rgba(14, 165, 233, 0.15)"
+              stroke="#0ea5e9"
+              strokeWidth={1 / zoom}
+              pointerEvents="none"
+            />
+          )}
           {currentLocal?.tipo === "linea" && (
             <line
               x1={currentLocal.x1}

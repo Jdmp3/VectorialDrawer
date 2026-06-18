@@ -28,7 +28,8 @@ function App() {
   const [colorFigura, setColorFigura] = useState("#000000");
   const [grosorFigura, setGrosorFigura] = useState(2);
   const [imagenCargada, setImagenCargada] = useState("");
-  const [clipboardElement, setClipboardElement] = useState<VectorElement | null>(null);
+  const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
+  const [clipboardElements, setClipboardElements] = useState<VectorElement[]>([]);
   const [elementos, setElementos] = useState<VectorElement[]>([]);
   const [elementosGuardados, setElementosGuardados] = useState<VectorElement[]>([]);
   const [mostrarAdvertencia, setMostrarAdvertencia] = useState(false);
@@ -39,6 +40,7 @@ function App() {
   useEffect(() => {
     if (herramientaActual !== "seleccionar") {
       setSelectedElementId(null);
+      setMultiSelectedIds([]);
     }
   }, [herramientaActual]);
 
@@ -65,7 +67,10 @@ function App() {
   };
 
   const clearElementos = () => {
-    if (herramientaActual === "seleccionar" && selectedElementId) {
+    if (herramientaActual === "seleccionar" && multiSelectedIds.length > 0) {
+      setElementos(elementos.filter(el => !multiSelectedIds.includes(el.id)));
+      setMultiSelectedIds([]);
+    } else if (herramientaActual === "seleccionar" && selectedElementId) {
       setElementos(elementos.filter(el => el.id !== selectedElementId));
       setSelectedElementId(null);
     } else {
@@ -81,6 +86,7 @@ function App() {
         colorLienzo,
         setColorLienzo,
         mostrarPrompt,
+        mostrarPromptGuardarCargar,
         offsetReal,
         offsetRender,
         setOffsetReal,
@@ -102,14 +108,16 @@ function App() {
         setCurrentElement: () => {},
         selectedElementId,
         setSelectedElementId,
+        multiSelectedIds,
+        setMultiSelectedIds,
         addElemento,
         actualizarElemento,
         clearElementos,
         setElementos,
         imagenCargada,
         setImagenCargada,
-        clipboardElement,
-        setClipboardElement,
+        clipboardElements,
+        setClipboardElements,
       }}
     >
       <section className="w-full h-screen bg-gray-700 overflow-hidden">
@@ -130,6 +138,7 @@ function App() {
                   setMostrarPrompt(true);
                   setElementos([]);
                   setSelectedElementId(null);
+                  setMultiSelectedIds([]);
                   setHerramientaActual("seleccionar");
                 });
                 setMostrarAdvertencia(true);
@@ -137,6 +146,7 @@ function App() {
                 setMostrarPrompt(true);
                 setElementos([]);
                 setSelectedElementId(null);
+                setMultiSelectedIds([]);
                 setHerramientaActual("seleccionar");
               }
             }}
@@ -178,6 +188,7 @@ function App() {
             setElementos(datos.elementos);
             setElementosGuardados(datos.elementos);
             setSelectedElementId(null);
+            setMultiSelectedIds([]);
             setOffsetReal({ x: 0, y: 0 });
             setOffsetRender({ x: 0, y: 0 });
             setZoom(1);

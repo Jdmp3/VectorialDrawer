@@ -48,8 +48,8 @@ function PromptGuardarCargar({
   onSaveSlot,
 }: Propiedades) {
   const { tamano, colorLienzo, elementos } = useContext(LienzoContext);
-  const [modoBorrar, setModoBorrar] = useState(false);
-  const [slotAParaBorrar, setSlotAParaBorrar] = useState<number | null>(null);
+  const [slotSeleccionado, setSlotSeleccionado] = useState<number | null>(null);
+  const [confirmandoBorrar, setConfirmandoBorrar] = useState(false);
   const [, setSlotsActualizados] = useState(0);
   const [expansion, setExpansion] = useState<{
     rect: DOMRect;
@@ -60,8 +60,8 @@ function PromptGuardarCargar({
 
   useEffect(() => {
     if (!mostrar) {
-      setModoBorrar(false);
-      setSlotAParaBorrar(null);
+      setSlotSeleccionado(null);
+      setConfirmandoBorrar(false);
     }
   }, [mostrar]);
 
@@ -96,46 +96,55 @@ function PromptGuardarCargar({
     });
   };
 
-  const handleSlotClick = (e: React.MouseEvent, index: number) => {
-    if (modoBorrar) {
-      if (slotAParaBorrar === null) {
-        const datos = leerSlot(index);
-        if (datos) {
-          setSlotAParaBorrar(index);
-        } else {
-          setModoBorrar(false);
-        }
-      } else {
-        setModoBorrar(false);
-        setSlotAParaBorrar(null);
-      }
-      return;
-    }
-
-    if (modo === "guardar") {
-      guardarSlot(index);
-      return;
-    }
-
+  const handleSlotClick = (_e: React.MouseEvent, index: number) => {
     if (modo === "cargar") {
       const datos = leerSlot(index);
       if (!datos) return;
-      const rect = e.currentTarget.getBoundingClientRect();
-      const svgEl = document.querySelector("[data-lienzo-svg]");
-      const targetRect = svgEl?.getBoundingClientRect() ?? new DOMRect(0, 0, window.innerWidth, window.innerHeight);
-      iniciarExpansion(rect, targetRect, datos);
-      setMostrar(false);
     }
+
+    if (slotSeleccionado === index) {
+      setSlotSeleccionado(null);
+    } else {
+      setSlotSeleccionado(index);
+    }
+    setConfirmandoBorrar(false);
   };
 
   const handleBorrarClick = () => {
-    if (slotAParaBorrar !== null) {
-      localStorage.removeItem(`vectorial_slot_${slotAParaBorrar}`);
-      setModoBorrar(false);
-      setSlotAParaBorrar(null);
+    if (slotSeleccionado === null) return;
+    const datos = leerSlot(slotSeleccionado);
+    if (!datos) return;
+
+    if (confirmandoBorrar) {
+      localStorage.removeItem(`vectorial_slot_${slotSeleccionado}`);
+      setSlotSeleccionado(null);
+      setConfirmandoBorrar(false);
       triggerRender();
     } else {
-      setModoBorrar(!modoBorrar);
+      setConfirmandoBorrar(true);
+    }
+  };
+
+  const handleGuardarCargarClick = () => {
+    if (slotSeleccionado === null) return;
+
+    if (modo === "guardar") {
+      guardarSlot(slotSeleccionado);
+    } else {
+      const datos = leerSlot(slotSeleccionado);
+      if (!datos) return;
+      const slotEl = document.querySelector(
+        `[data-slot-index="${slotSeleccionado}"]`
+      );
+      const rect =
+        slotEl?.getBoundingClientRect() ??
+        new DOMRect(0, 0, 0, 0);
+      const svgEl = document.querySelector("[data-lienzo-svg]");
+      const targetRect =
+        svgEl?.getBoundingClientRect() ??
+        new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+      iniciarExpansion(rect, targetRect, datos);
+      setMostrar(false);
     }
   };
 
@@ -147,6 +156,9 @@ function PromptGuardarCargar({
           headerText: "text-white",
           slotBg: "bg-emerald-600/60",
           slotHover: "hover:bg-emerald-400/80",
+          slotSelected: "bg-emerald-300/80",
+          btnBg: "bg-emerald-600",
+          btnBorder: "border-emerald-800",
           text: "text-white",
           muted: "text-emerald-100",
         }
@@ -156,6 +168,9 @@ function PromptGuardarCargar({
           headerText: "text-stone-800",
           slotBg: "bg-amber-500/60",
           slotHover: "hover:bg-amber-300/80",
+          slotSelected: "bg-amber-200/80",
+          btnBg: "bg-amber-600",
+          btnBorder: "border-amber-800",
           text: "text-stone-800",
           muted: "text-stone-600",
         };
@@ -167,8 +182,8 @@ function PromptGuardarCargar({
           className="fixed inset-0 bg-black/50 z-[55]"
           onClick={() => {
             setMostrar(false);
-            setModoBorrar(false);
-            setSlotAParaBorrar(null);
+            setSlotSeleccionado(null);
+            setConfirmandoBorrar(false);
           }}
         />
       )}
@@ -187,8 +202,8 @@ function PromptGuardarCargar({
           <button
             onClick={() => {
               setMostrar(false);
-              setModoBorrar(false);
-              setSlotAParaBorrar(null);
+              setSlotSeleccionado(null);
+              setConfirmandoBorrar(false);
             }}
             className={`p-1 rounded-lg ${colores.slotHover} transition-colors`}
           >
@@ -217,16 +232,21 @@ function PromptGuardarCargar({
               <button
                 key={i}
                 onClick={(e) => handleSlotClick(e, i)}
-              disabled={false}
+              data-slot-index={i}
                 className={`relative rounded-lg overflow-hidden transition-all duration-200 ease-in-out 
                     ${colores.slotBg} ${colores.slotHover}
                     ${
                       modo === "cargar" && !ocupado ? "opacity-50" : ""
                     }
                     ${
-                      modo === "cargar" && !ocupado && !modoBorrar
-                        ? "cursor-not-allowed hover:scale-100 hover:shadow-none"
-                        : "cursor-pointer hover:scale-[1.04] hover:shadow-lg hover:shadow-black/30"
+                      modo === "cargar" && !ocupado
+                        ? "cursor-not-allowed"
+                        : "cursor-pointer"
+                    }
+                    ${
+                      slotSeleccionado === i
+                        ? `${colores.slotSelected} ring-2 ring-white/80 scale-[1.04] shadow-lg shadow-black/30`
+                        : ""
                     }
                     p-1.5 flex flex-col items-center
                   `}
@@ -282,15 +302,56 @@ function PromptGuardarCargar({
           })}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={handleGuardarCargarClick}
+            disabled={slotSeleccionado === null}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-xs sm:text-sm transition-all duration-200 border-2 ${
+              slotSeleccionado !== null
+                ? `${colores.btnBg} hover:brightness-110 text-white ${colores.btnBorder}`
+                : "bg-stone-600 text-stone-400 border-stone-700 cursor-not-allowed"
+            }`}
+          >
+            {modo === "guardar" ? (
+              <svg
+                className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                />
+              </svg>
+            )}
+            {modo === "guardar" ? "Guardar" : "Cargar"}
+          </button>
           <button
             onClick={handleBorrarClick}
+            disabled={slotSeleccionado === null || !leerSlot(slotSeleccionado)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-xs sm:text-sm transition-all duration-200 border-2 ${
-              slotAParaBorrar !== null
+              confirmandoBorrar
                 ? "bg-rose-400 text-white border-rose-200 shadow-lg shadow-rose-500/40"
-                : modoBorrar
-                  ? "bg-rose-800 text-white border-rose-700"
-                  : "bg-rose-600 text-white border-rose-600 hover:bg-rose-500 hover:border-rose-300"
+                : slotSeleccionado !== null && leerSlot(slotSeleccionado)
+                  ? "bg-rose-600 text-white border-rose-600 hover:bg-rose-500 hover:border-rose-300"
+                  : "bg-rose-800/50 text-rose-400/50 border-rose-800/50 cursor-not-allowed"
             }`}
           >
             <svg
@@ -306,7 +367,7 @@ function PromptGuardarCargar({
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
               />
             </svg>
-            {slotAParaBorrar !== null ? "¿Seguro?" : "Borrar"}
+            {confirmandoBorrar ? "¿Seguro?" : "Borrar"}
           </button>
         </div>
       </div>

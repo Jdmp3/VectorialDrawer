@@ -75,7 +75,11 @@ func main() {
 
 	address := os.Getenv("API_ADDR")
 	if address == "" {
-		address = "127.0.0.1:8080"
+		address = "127.0.0.1:8080" // Local
+
+		if port := os.Getenv("PORT"); port != "" {
+    		address = "0.0.0.0:" + port // Render
+		}
 	}
 	log.Printf("API lista en http://%s", address)
 	log.Fatal(http.ListenAndServe(address, cors(mux)))

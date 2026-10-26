@@ -1,13 +1,15 @@
 import { useContext, useState, useEffect } from "react";
 import { LienzoContext, VectorElement } from "./ContextDeLienzo";
 import { generarSVGMiniatura, miniaturaToDataURL } from "../utils/thumbnail";
+import {
+  borrarEspacio,
+  DatosLienzo,
+  inicializarEspacios,
+  RegistroEspacio,
+  guardarEspacio as guardarEnBackend,
+} from "../services/canvasApi";
 
-interface DatosSlot {
-  tamano: number;
-  colorLienzo: string;
-  elementos: VectorElement[];
-  guardadoEn: string;
-}
+type DatosSlot = RegistroEspacio;
 
 interface Propiedades {
   mostrar: boolean;
@@ -19,16 +21,6 @@ interface Propiedades {
     elementos: VectorElement[];
   }) => void;
   onSaveSlot?: () => void;
-}
-
-function leerSlot(index: number): DatosSlot | null {
-  try {
-    const raw = localStorage.getItem(`vectorial_slot_${index}`);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
 }
 
 function formatearFecha(iso: string): string {
@@ -50,7 +42,10 @@ function PromptGuardarCargar({
   const { tamano, colorLienzo, elementos } = useContext(LienzoContext);
   const [slotSeleccionado, setSlotSeleccionado] = useState<number | null>(null);
   const [confirmandoBorrar, setConfirmandoBorrar] = useState(false);
-  const [, setSlotsActualizados] = useState(0);
+  const [slots, setSlots] = useState<Array<DatosSlot | null>>(Array(9).fill(null));
+  const [cargandoSlots, setCargandoSlots] = useState(true);
+  const [errorBackend, setErrorBackend] = useState("");
+  const [avisoMigracion, setAvisoMigracion] = useState(false);
   const [expansion, setExpansion] = useState<{
     rect: DOMRect;
     targetRect: DOMRect;
@@ -59,28 +54,65 @@ function PromptGuardarCargar({
   } | null>(null);
 
   useEffect(() => {
+    let activo = true;
+    inicializarEspacios()
+      .then((resultado) => {
+        if (!activo) return;
+        setSlots(resultado.espacios);
+        setAvisoMigracion(resultado.conflictoMigracion);
+        setErrorBackend("");
+      })
+      .catch((error: unknown) => {
+        if (!activo) return;
+        setErrorBackend(
+          error instanceof Error ? error.message : "No se pudieron cargar los espacios."
+        );
+      })
+      .finally(() => {
+        if (activo) setCargandoSlots(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  const reintentarCarga = async () => {
+    setCargandoSlots(true);
+    try {
+      const resultado = await inicializarEspacios();
+      setSlots(resultado.espacios);
+      setAvisoMigracion(resultado.conflictoMigracion);
+      setErrorBackend("");
+    } catch (error) {
+      setErrorBackend(
+        error instanceof Error ? error.message : "No se pudieron cargar los espacios."
+      );
+    } finally {
+      setCargandoSlots(false);
+    }
+  };
+
+  useEffect(() => {
     if (!mostrar) {
       setSlotSeleccionado(null);
       setConfirmandoBorrar(false);
     }
   }, [mostrar]);
 
-  const triggerRender = () => setSlotsActualizados((s) => s + 1);
-
-  const guardarSlot = (index: number) => {
-    const datos: DatosSlot = {
+  const guardarSlot = async (index: number) => {
+    const datos: DatosLienzo = {
       tamano,
       colorLienzo,
       elementos,
-      guardadoEn: new Date().toISOString(),
     };
     try {
-      localStorage.setItem(`vectorial_slot_${index}`, JSON.stringify(datos));
+      const guardado = await guardarEnBackend(index, datos);
+      setSlots((actuales) => actuales.map((slot, i) => (i === index ? guardado : slot)));
+      setErrorBackend("");
       onSaveSlot?.();
-      triggerRender();
-    } catch {
-      alert(
-        "No hay suficiente espacio de almacenamiento para guardar este lienzo."
+    } catch (error) {
+      setErrorBackend(
+        error instanceof Error ? error.message : "No se pudo guardar el lienzo."
       );
     }
   };
@@ -97,10 +129,7 @@ function PromptGuardarCargar({
   };
 
   const handleSlotClick = (_e: React.MouseEvent, index: number) => {
-    if (modo === "cargar") {
-      const datos = leerSlot(index);
-      if (!datos) return;
-    }
+    if (modo === "cargar" && !slots[index]) return;
 
     if (slotSeleccionado === index) {
       setSlotSeleccionado(null);
@@ -110,28 +139,35 @@ function PromptGuardarCargar({
     setConfirmandoBorrar(false);
   };
 
-  const handleBorrarClick = () => {
+  const handleBorrarClick = async () => {
     if (slotSeleccionado === null) return;
-    const datos = leerSlot(slotSeleccionado);
+    const datos = slots[slotSeleccionado];
     if (!datos) return;
 
     if (confirmandoBorrar) {
-      localStorage.removeItem(`vectorial_slot_${slotSeleccionado}`);
-      setSlotSeleccionado(null);
-      setConfirmandoBorrar(false);
-      triggerRender();
+      try {
+        await borrarEspacio(slotSeleccionado);
+        setSlots((actuales) => actuales.map((slot, i) => (i === slotSeleccionado ? null : slot)));
+        setSlotSeleccionado(null);
+        setConfirmandoBorrar(false);
+        setErrorBackend("");
+      } catch (error) {
+        setErrorBackend(
+          error instanceof Error ? error.message : "No se pudo borrar el lienzo."
+        );
+      }
     } else {
       setConfirmandoBorrar(true);
     }
   };
 
-  const handleGuardarCargarClick = () => {
+  const handleGuardarCargarClick = async () => {
     if (slotSeleccionado === null) return;
 
     if (modo === "guardar") {
-      guardarSlot(slotSeleccionado);
+      await guardarSlot(slotSeleccionado);
     } else {
-      const datos = leerSlot(slotSeleccionado);
+      const datos = slots[slotSeleccionado];
       if (!datos) return;
       const slotEl = document.querySelector(
         `[data-slot-index="${slotSeleccionado}"]`
@@ -223,9 +259,33 @@ function PromptGuardarCargar({
           </button>
         </div>
 
+        {(errorBackend || avisoMigracion) && (
+          <div
+            role="alert"
+            className={`mb-3 rounded-lg px-3 py-2 text-sm ${
+              errorBackend
+                ? "bg-rose-800/90 text-white"
+                : "bg-amber-100 text-amber-950"
+            }`}
+          >
+            {errorBackend ||
+              "Hay lienzos antiguos en este navegador y la base ya contiene datos. No se sobrescribieron; los datos del navegador siguen allí."}
+            {errorBackend && (
+              <button
+                type="button"
+                onClick={reintentarCarga}
+                disabled={cargandoSlots}
+                className="ml-2 underline underline-offset-2 disabled:opacity-60"
+              >
+                Reintentar
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3">
           {Array.from({ length: 9 }, (_, i) => {
-            const datos = leerSlot(i);
+            const datos = slots[i];
             const ocupado = datos !== null;
 
             return (
@@ -305,7 +365,7 @@ function PromptGuardarCargar({
         <div className="flex justify-end gap-2">
           <button
             onClick={handleGuardarCargarClick}
-            disabled={slotSeleccionado === null}
+                disabled={slotSeleccionado === null || cargandoSlots}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-xs sm:text-sm transition-all duration-200 border-2 ${
               slotSeleccionado !== null
                 ? `${colores.btnBg} hover:brightness-110 text-white ${colores.btnBorder}`
@@ -345,11 +405,11 @@ function PromptGuardarCargar({
           </button>
           <button
             onClick={handleBorrarClick}
-            disabled={slotSeleccionado === null || !leerSlot(slotSeleccionado)}
+            disabled={slotSeleccionado === null || !slots[slotSeleccionado] || cargandoSlots}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-xs sm:text-sm transition-all duration-200 border-2 ${
               confirmandoBorrar
                 ? "bg-rose-400 text-white border-rose-200 shadow-lg shadow-rose-500/40"
-                : slotSeleccionado !== null && leerSlot(slotSeleccionado)
+                : slotSeleccionado !== null && slots[slotSeleccionado]
                   ? "bg-rose-600 text-white border-rose-600 hover:bg-rose-500 hover:border-rose-300"
                   : "bg-rose-800/50 text-rose-400/50 border-rose-800/50 cursor-not-allowed"
             }`}

@@ -40,7 +40,8 @@ type migrationEntry struct {
 }
 
 type server struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *imageStorage
 }
 
 func main() {
@@ -64,7 +65,15 @@ func main() {
 		log.Fatalf("No se pudo preparar la tabla lienzo: %v", err)
 	}
 
-	api := &server{db: db}
+	storage, err := newImageStorage(ctx)
+	if err != nil {
+		log.Fatalf("No se pudo configurar S3: %v", err)
+	}
+	api := &server{db: db, storage: storage}
+	if err := api.prepareCleanupTable(ctx); err != nil {
+		log.Fatalf("No se pudo preparar la cola de limpieza S3: %v", err)
+	}
+	go api.procesarLimpiezaPendiente()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", api.health)
 	mux.HandleFunc("GET /api/slots", api.listarEspacios)
@@ -72,13 +81,14 @@ func main() {
 	mux.HandleFunc("PUT /api/slots/{espacio}", api.guardarEspacio)
 	mux.HandleFunc("DELETE /api/slots/{espacio}", api.borrarEspacio)
 	mux.HandleFunc("POST /api/slots/migrate", api.migrarEspacios)
+	mux.HandleFunc("POST /api/images/upload-url", api.crearURLSubidaImagen)
 
 	address := os.Getenv("API_ADDR")
 	if address == "" {
 		address = "127.0.0.1:8080" // Local
 
 		if port := os.Getenv("PORT"); port != "" {
-    		address = "0.0.0.0:" + port // Render
+			address = "0.0.0.0:" + port // Render
 		}
 	}
 	log.Printf("API lista en http://%s", address)
@@ -130,6 +140,10 @@ func (s *server) listarEspacios(w http.ResponseWriter, r *http.Request) {
 			Espacio: espacio, Tamano: datos.Tamano, ColorLienzo: datos.ColorLienzo,
 			Elementos: datos.Elementos, GuardadoEn: guardadoEn,
 		}
+		if err := s.firmarImagenes(r.Context(), registros[espacio]); err != nil {
+			writeError(w, http.StatusInternalServerError, "No se pudieron preparar las imágenes del lienzo")
+			return
+		}
 	}
 	if err := rows.Err(); err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudieron leer los espacios")
@@ -171,6 +185,9 @@ func (s *server) obtenerEspacio(ctx context.Context, espacio int) (*slotRecord, 
 	registro.Tamano = datos.Tamano
 	registro.ColorLienzo = datos.ColorLienzo
 	registro.Elementos = datos.Elementos
+	if err := s.firmarImagenes(ctx, registro); err != nil {
+		return nil, err
+	}
 	return registro, nil
 }
 
@@ -188,12 +205,36 @@ func (s *server) guardarEspacio(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	createdKeys, err := s.prepararImagenes(r.Context(), espacio, &datos)
+	if err != nil {
+		s.eliminarNuevasImagenes(createdKeys)
+		writeError(w, http.StatusBadGateway, "No se pudieron preparar las imágenes en S3")
+		return
+	}
+	saved := false
+	defer func() {
+		if !saved {
+			s.eliminarNuevasImagenes(createdKeys)
+		}
+	}()
+	actuales, err := s.leerClavesEspacio(r.Context(), espacio)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo revisar el lienzo anterior")
+		return
+	}
+	nuevas := clavesImagenes(datos.Elementos)
 	raw, err := json.Marshal(datos)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "No se pudieron procesar los datos del lienzo")
 		return
 	}
-	_, err = s.db.ExecContext(r.Context(), `
+	tx, err := s.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo iniciar el guardado del lienzo")
+		return
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(r.Context(), `
 		INSERT INTO lienzo (espacio, datos, guardado_en)
 		VALUES ($1, $2::jsonb, NOW())
 		ON CONFLICT (espacio) DO UPDATE
@@ -202,6 +243,18 @@ func (s *server) guardarEspacio(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "No se pudo guardar el lienzo")
 		return
 	}
+	for _, key := range diferenciaClaves(actuales, nuevas) {
+		if _, err := tx.ExecContext(r.Context(), `INSERT INTO s3_cleanup (object_key) VALUES ($1) ON CONFLICT DO NOTHING`, key); err != nil {
+			writeError(w, http.StatusInternalServerError, "No se pudo registrar la limpieza de imágenes anteriores")
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo guardar el lienzo")
+		return
+	}
+	saved = true
+	go s.procesarLimpieza()
 	registro, err := s.obtenerEspacio(r.Context(), espacio)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "El lienzo se guardó, pero no se pudo leer la respuesta")
@@ -215,10 +268,32 @@ func (s *server) borrarEspacio(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := s.db.ExecContext(r.Context(), `DELETE FROM lienzo WHERE espacio = $1`, espacio); err != nil {
+	tx, err := s.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo iniciar el borrado del lienzo")
+		return
+	}
+	defer tx.Rollback()
+	keys, err := leerClavesEspacioTx(r.Context(), tx, espacio)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudieron identificar las imágenes del lienzo")
+		return
+	}
+	if _, err := tx.ExecContext(r.Context(), `DELETE FROM lienzo WHERE espacio = $1`, espacio); err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudo borrar el lienzo")
 		return
 	}
+	for _, key := range keys {
+		if _, err := tx.ExecContext(r.Context(), `INSERT INTO s3_cleanup (object_key) VALUES ($1) ON CONFLICT DO NOTHING`, key); err != nil {
+			writeError(w, http.StatusInternalServerError, "No se pudo registrar la limpieza de imágenes")
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo borrar el lienzo")
+		return
+	}
+	go s.procesarLimpieza()
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -248,6 +323,22 @@ func (s *server) migrarEspacios(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	var migradas []string
+	for i := range entradas {
+		created, err := s.prepararImagenes(r.Context(), entradas[i].Espacio, &entradas[i].Datos)
+		migradas = append(migradas, created...)
+		if err != nil {
+			s.eliminarNuevasImagenes(migradas)
+			writeError(w, http.StatusBadGateway, "No se pudieron migrar las imágenes antiguas a S3")
+			return
+		}
+	}
+	migracionCompletada := false
+	defer func() {
+		if !migracionCompletada {
+			s.eliminarNuevasImagenes(migradas)
+		}
+	}()
 
 	tx, err := s.db.BeginTx(r.Context(), nil)
 	if err != nil {
@@ -286,6 +377,7 @@ func (s *server) migrarEspacios(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "No se pudo completar la migración")
 		return
 	}
+	migracionCompletada = true
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -34,7 +34,13 @@ export interface ImageShape {
   x: number; y: number;
   width: number; height: number;
   src: string;
+  storageKey?: string;
   degres: number;
+}
+
+export interface ImagenCargada {
+  src: string;
+  storageKey: string;
 }
 
 export type VectorElement = LineaShape | RectShape | CircleShape | ImageShape;
@@ -73,8 +79,8 @@ interface LienzoContextType {
   actualizarElemento: (id: string, elemento: VectorElement) => void;
   clearElementos: () => void;
   setElementos: (el: VectorElement[]) => void;
-  imagenCargada: string;
-  setImagenCargada: (src: string) => void;
+  imagenCargada: ImagenCargada | null;
+  setImagenCargada: (imagen: ImagenCargada | null) => void;
   clipboardElements: VectorElement[];
   setClipboardElements: (els: VectorElement[]) => void;
 }
@@ -113,7 +119,7 @@ export const LienzoContext = createContext<LienzoContextType>({
   actualizarElemento: () => {},
   clearElementos: () => {},
   setElementos: () => {},
-  imagenCargada: "",
+  imagenCargada: null,
   setImagenCargada: () => {},
   clipboardElements: [],
   setClipboardElements: () => {},

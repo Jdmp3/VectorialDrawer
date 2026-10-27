@@ -306,7 +306,8 @@ function Lienzo() {
             y: pos.y,
             width: 0,
             height: 0,
-            src: imagenCargada,
+            src: imagenCargada?.src ?? "",
+            storageKey: imagenCargada?.storageKey,
             degres: 0,
           };
           break;

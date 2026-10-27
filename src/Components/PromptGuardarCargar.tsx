@@ -20,7 +20,7 @@ interface Propiedades {
     colorLienzo: string;
     elementos: VectorElement[];
   }) => void;
-  onSaveSlot?: () => void;
+  onSaveSlot?: (elementos: VectorElement[]) => void;
 }
 
 function formatearFecha(iso: string): string {
@@ -109,7 +109,7 @@ function PromptGuardarCargar({
       const guardado = await guardarEnBackend(index, datos);
       setSlots((actuales) => actuales.map((slot, i) => (i === index ? guardado : slot)));
       setErrorBackend("");
-      onSaveSlot?.();
+      onSaveSlot?.(guardado.elementos);
     } catch (error) {
       setErrorBackend(
         error instanceof Error ? error.message : "No se pudo guardar el lienzo."

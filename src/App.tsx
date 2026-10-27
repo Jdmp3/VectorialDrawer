@@ -27,7 +27,10 @@ function App() {
   const [figuraTipo, setFiguraTipo] = useState<"linea" | "rectangulo" | "circulo" | "imagen">("linea");
   const [colorFigura, setColorFigura] = useState("#000000");
   const [grosorFigura, setGrosorFigura] = useState(2);
-  const [imagenCargada, setImagenCargada] = useState("");
+  const [imagenCargada, setImagenCargada] = useState<{
+    src: string;
+    storageKey: string;
+  } | null>(null);
   const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
   const [clipboardElements, setClipboardElements] = useState<VectorElement[]>([]);
   const [elementos, setElementos] = useState<VectorElement[]>([]);
@@ -193,7 +196,19 @@ function App() {
             setOffsetRender({ x: 0, y: 0 });
             setZoom(1);
           }}
-          onSaveSlot={() => setElementosGuardados([...elementos])}
+          onSaveSlot={(elementosGuardadosEnBackend) => {
+            const idsImagenActiva = elementos
+              .filter((elemento) => elemento.tipo === "imagen" && elemento.storageKey === imagenCargada?.storageKey)
+              .map((elemento) => elemento.id);
+            const imagenGuardada = elementosGuardadosEnBackend.find(
+              (elemento) => elemento.tipo === "imagen" && idsImagenActiva.includes(elemento.id)
+            );
+            if (imagenGuardada?.tipo === "imagen" && imagenGuardada.storageKey) {
+              setImagenCargada({ src: imagenGuardada.src, storageKey: imagenGuardada.storageKey });
+            }
+            setElementos(elementosGuardadosEnBackend);
+            setElementosGuardados(elementosGuardadosEnBackend);
+          }}
         />
         <PromptAdvertenciaCambios
           mostrar={mostrarAdvertencia}

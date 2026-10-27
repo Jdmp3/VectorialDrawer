@@ -1,5 +1,6 @@
 import { useContext, useState, useEffect, useRef } from "react";
 import { LienzoContext } from "./ContextDeLienzo";
+import { subirImagen } from "../services/canvasApi";
 
 function PanelFiguras() {
   const {
@@ -16,6 +17,8 @@ function PanelFiguras() {
   } = useContext(LienzoContext);
 
   const [visible, setVisible] = useState(false);
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
+  const [errorImagen, setErrorImagen] = useState("");
   const [infoVisible, setInfoVisible] = useState(false);
   const infoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const infoMostradoRef = useRef(false);
@@ -50,16 +53,20 @@ function PanelFiguras() {
     }, 3000);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setImagenCargada((ev.target?.result as string) || "");
+    setSubiendoImagen(true);
+    setErrorImagen("");
+    try {
+      setImagenCargada(await subirImagen(file));
       triggerInfo();
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+    } catch (error) {
+      setErrorImagen(error instanceof Error ? error.message : "No se pudo subir la imagen.");
+    } finally {
+      setSubiendoImagen(false);
+      e.target.value = "";
+    }
   };
 
   return (
@@ -99,14 +106,15 @@ function PanelFiguras() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleCargarClick}
+              disabled={subiendoImagen}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
             >
-              {imagenCargada ? "Cambiar" : "Cargar"}
+              {subiendoImagen ? "Subiendo…" : imagenCargada ? "Cambiar" : "Cargar"}
             </button>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               className="hidden"
               onChange={handleFileChange}
             />
@@ -140,6 +148,7 @@ function PanelFiguras() {
             </div>
           </>
         )}
+        {errorImagen && <p className="max-w-56 text-xs text-red-300">{errorImagen}</p>}
       </div>
       <div
         style={{

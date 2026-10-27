@@ -14,6 +14,12 @@ export interface RegistroEspacio extends DatosGuardados {
   espacio: number;
 }
 
+interface RespuestaSubidaImagen {
+  key: string;
+  uploadUrl: string;
+  viewUrl: string;
+}
+
 const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8080").replace(/\/$/, "");
 const CLAVE_MIGRACION = "vectorial_postgres_migrado_v1";
 
@@ -61,6 +67,30 @@ export function guardarEspacio(
 
 export function borrarEspacio(espacio: number): Promise<void> {
   return request<void>(`/api/slots/${espacio}`, { method: "DELETE" });
+}
+
+export async function subirImagen(file: File): Promise<{ storageKey: string; src: string }> {
+  const { key, uploadUrl, viewUrl } = await request<RespuestaSubidaImagen>(
+    "/api/images/upload-url",
+    {
+      method: "POST",
+      body: JSON.stringify({ contentType: file.type, size: file.size }),
+    }
+  );
+  let response: Response;
+  try {
+    response = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+  } catch {
+    throw new Error("No se pudo conectar con el bucket S3.");
+  }
+  if (!response.ok) {
+    throw new Error("S3 rechazó la subida de la imagen.");
+  }
+  return { storageKey: key, src: viewUrl };
 }
 
 interface ResultadoInicializacion {

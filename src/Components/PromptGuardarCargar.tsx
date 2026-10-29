@@ -11,6 +11,12 @@ import {
 
 type DatosSlot = RegistroEspacio;
 
+function mensajeError(error: unknown, fallback: string): string {
+  const detalle = (error instanceof Error ? error.message : fallback).replace(/^Error:\s*/i, "");
+  const sinServicios = detalle.replace(/\bGo\b|\bbase de datos\b|\bPostgreSQL?\b|\bS3\b|\bbucket\b/gi, "servicio");
+  return `Error: ${sinServicios}`;
+}
+
 interface Propiedades {
   mostrar: boolean;
   setMostrar: (v: boolean) => void;
@@ -69,7 +75,7 @@ function PromptGuardarCargar({
       .catch((error: unknown) => {
         if (!activo) return;
         setErrorBackend(
-          error instanceof Error ? error.message : "No se pudieron cargar los espacios."
+          mensajeError(error, "No se pudieron cargar los espacios.")
         );
       })
       .finally(() => {
@@ -89,7 +95,7 @@ function PromptGuardarCargar({
       setErrorBackend("");
     } catch (error) {
       setErrorBackend(
-        error instanceof Error ? error.message : "No se pudieron cargar los espacios."
+        mensajeError(error, "No se pudieron cargar los espacios.")
       );
     } finally {
       setCargandoSlots(false);
@@ -121,7 +127,7 @@ function PromptGuardarCargar({
       return true;
     } catch (error) {
       setErrorBackend(
-        error instanceof Error ? error.message : "No se pudo guardar el lienzo."
+        mensajeError(error, "No se pudo guardar el lienzo.")
       );
       return false;
     } finally {
@@ -163,7 +169,7 @@ function PromptGuardarCargar({
         setErrorBackend("");
       } catch (error) {
         setErrorBackend(
-          error instanceof Error ? error.message : "No se pudo borrar el lienzo."
+          mensajeError(error, "No se pudo borrar el lienzo.")
         );
       } finally {
         setOperacion(null);
@@ -454,13 +460,7 @@ function PromptGuardarCargar({
           <div className="mb-3 flex items-center gap-2 rounded-lg bg-black/15 px-3 py-2 text-sm" role="status" aria-live="polite">
             <span className="loading-spinner" aria-hidden="true" />
             <span>
-              {cargandoSlots
-                ? "Consultando Go y la base de datos…"
-                : operacion === "guardando"
-                  ? "Guardando lienzo en la base de datos…"
-                  : operacion === "borrando"
-                    ? "Borrando lienzo…"
-                    : "Cargando lienzo…"}
+              Cargando
             </span>
           </div>
         )}
@@ -585,7 +585,7 @@ function PromptGuardarCargar({
                 />
               </svg>
             )}
-            {operacion === "guardando" ? "Guardando…" : operacion === "cargando" ? "Cargando…" : modo === "guardar" ? "Guardar" : "Cargar"}
+            {operacion ? "Cargando" : modo === "guardar" ? "Guardar" : "Cargar"}
           </button>
           <button
             onClick={handleBorrarClick}
@@ -654,7 +654,7 @@ function PromptGuardarCargar({
           />
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 text-sm font-medium text-white" role="status">
             <span className="loading-spinner mr-2" aria-hidden="true" />
-            Cargando lienzo…
+            Cargando
           </div>
         </div>
       )}

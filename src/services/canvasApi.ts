@@ -34,11 +34,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       },
     });
   } catch {
-    throw new Error("No se pudo conectar con el backend de Go.");
+    throw new Error("No se pudo conectar con el servicio.");
   }
 
   if (!response.ok) {
-    let message = `Error del backend (${response.status}).`;
+    let message = `El servicio respondió con estado ${response.status}.`;
     try {
       const body = (await response.json()) as { error?: string };
       if (body.error) message = body.error;
@@ -69,11 +69,7 @@ export function borrarEspacio(espacio: number): Promise<void> {
   return request<void>(`/api/slots/${espacio}`, { method: "DELETE" });
 }
 
-export async function subirImagen(
-  file: File,
-  onStage?: (stage: "solicitando-url" | "subiendo") => void,
-): Promise<{ storageKey: string; src: string }> {
-  onStage?.("solicitando-url");
+export async function subirImagen(file: File): Promise<{ storageKey: string; src: string }> {
   const { key, uploadUrl, viewUrl } = await request<RespuestaSubidaImagen>(
     "/api/images/upload-url",
     {
@@ -81,7 +77,6 @@ export async function subirImagen(
       body: JSON.stringify({ contentType: file.type, size: file.size }),
     }
   );
-  onStage?.("subiendo");
   let response: Response;
   try {
     response = await fetch(uploadUrl, {
@@ -90,10 +85,10 @@ export async function subirImagen(
       body: file,
     });
   } catch {
-    throw new Error("No se pudo conectar con el bucket S3.");
+    throw new Error("No se pudo conectar para subir la imagen.");
   }
   if (!response.ok) {
-    throw new Error("S3 rechazó la subida de la imagen.");
+    throw new Error("El servicio rechazó la subida de la imagen.");
   }
   return { storageKey: key, src: viewUrl };
 }

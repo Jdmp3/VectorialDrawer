@@ -69,7 +69,11 @@ export function borrarEspacio(espacio: number): Promise<void> {
   return request<void>(`/api/slots/${espacio}`, { method: "DELETE" });
 }
 
-export async function subirImagen(file: File): Promise<{ storageKey: string; src: string }> {
+export async function subirImagen(
+  file: File,
+  onStage?: (stage: "solicitando-url" | "subiendo") => void,
+): Promise<{ storageKey: string; src: string }> {
+  onStage?.("solicitando-url");
   const { key, uploadUrl, viewUrl } = await request<RespuestaSubidaImagen>(
     "/api/images/upload-url",
     {
@@ -77,6 +81,7 @@ export async function subirImagen(file: File): Promise<{ storageKey: string; src
       body: JSON.stringify({ contentType: file.type, size: file.size }),
     }
   );
+  onStage?.("subiendo");
   let response: Response;
   try {
     response = await fetch(uploadUrl, {

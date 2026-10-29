@@ -1131,10 +1131,11 @@ function Lienzo() {
                           width={el.width}
                           height={el.height}
                           pointerEvents="none"
-                          aria-label="Cargando imagen"
+                          aria-label="Cargando"
                         />
                       ) : estadoImagen === "error" ? (
                         <g pointerEvents="none">
+                          <title>Error: imagen no disponible</title>
                           <rect x={el.x} y={el.y} width={el.width} height={el.height} fill="#52525b" />
                           <path d={`M ${el.x} ${el.y} L ${el.x + el.width} ${el.y + el.height} M ${el.x + el.width} ${el.y} L ${el.x} ${el.y + el.height}`} stroke="#d4d4d8" strokeWidth={Math.max(0.05, Math.min(el.width, el.height) * 0.04)} />
                         </g>

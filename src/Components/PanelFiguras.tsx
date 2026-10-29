@@ -2,6 +2,12 @@ import { useContext, useState, useEffect, useRef } from "react";
 import { LienzoContext } from "./ContextDeLienzo";
 import { subirImagen } from "../services/canvasApi";
 
+function mensajeError(error: unknown, fallback: string): string {
+  const detalle = (error instanceof Error ? error.message : fallback).replace(/^Error:\s*/i, "");
+  const sinServicios = detalle.replace(/\bGo\b|\bbase de datos\b|\bPostgreSQL?\b|\bS3\b|\bbucket\b/gi, "servicio");
+  return `Error: ${sinServicios}`;
+}
+
 function PanelFiguras() {
   const {
     herramientaActual,
@@ -18,7 +24,6 @@ function PanelFiguras() {
 
   const [visible, setVisible] = useState(false);
   const [subiendoImagen, setSubiendoImagen] = useState(false);
-  const [etapaSubida, setEtapaSubida] = useState<"solicitando-url" | "subiendo">("solicitando-url");
   const [cargandoVistaPrevia, setCargandoVistaPrevia] = useState(false);
   const [errorVistaPrevia, setErrorVistaPrevia] = useState(false);
   const [errorImagen, setErrorImagen] = useState("");
@@ -60,16 +65,15 @@ function PanelFiguras() {
     const file = e.target.files?.[0];
     if (!file) return;
     setSubiendoImagen(true);
-    setEtapaSubida("solicitando-url");
     setErrorImagen("");
     setErrorVistaPrevia(false);
     try {
-      const imagen = await subirImagen(file, setEtapaSubida);
+      const imagen = await subirImagen(file);
       setCargandoVistaPrevia(true);
       setImagenCargada(imagen);
       triggerInfo();
     } catch (error) {
-      setErrorImagen(error instanceof Error ? error.message : "No se pudo subir la imagen.");
+      setErrorImagen(mensajeError(error, "No se pudo subir la imagen."));
     } finally {
       setSubiendoImagen(false);
       e.target.value = "";
@@ -117,12 +121,12 @@ function PanelFiguras() {
               disabled={subiendoImagen}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 transition-colors"
             >
-              {subiendoImagen ? (etapaSubida === "solicitando-url" ? "Conectando…" : "Subiendo…") : imagenCargada ? "Cambiar" : "Cargar"}
+              {subiendoImagen ? "Cargando" : imagenCargada ? "Cambiar" : "Cargar"}
             </button>
               {subiendoImagen && (
                 <span className="flex items-center gap-2 text-xs text-zinc-300" role="status" aria-live="polite">
                   <span className="loading-spinner" aria-hidden="true" />
-                  {etapaSubida === "solicitando-url" ? "Solicitando carga a Go…" : "Enviando imagen a S3…"}
+                  Cargando
                 </span>
               )}
             <input
@@ -135,9 +139,9 @@ function PanelFiguras() {
             </div>
             {imagenCargada && (
               <div className="relative h-24 w-full overflow-hidden rounded-lg bg-zinc-800" aria-busy={cargandoVistaPrevia}>
-                {cargandoVistaPrevia && <div className="image-skeleton absolute inset-0" aria-label="Cargando vista previa" />}
+                {cargandoVistaPrevia && <div className="image-skeleton absolute inset-0" aria-label="Cargando" />}
                 {errorVistaPrevia ? (
-                  <div className="flex h-full items-center justify-center text-xs text-zinc-300">Imagen no disponible</div>
+                  <div className="flex h-full items-center justify-center text-xs text-zinc-300">Error: imagen no disponible</div>
                 ) : (
                   <img
                     key={imagenCargada.src}

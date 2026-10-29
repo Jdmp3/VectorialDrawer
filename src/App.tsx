@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Prompteador from "./Components/PromptDeLienzo";
 import AnimacionMorphing from "./Components/AnimacionMorphing";
 import PromptGuardarCargar from "./Components/PromptGuardarCargar";
@@ -11,6 +11,8 @@ import PanelFiguras from "./Components/PanelFiguras";
 import PanelSeleccion from "./Components/PanelSeleccion";
 import MenuHamburguesa from "./Components/MenuHamburguesa";
 import { LienzoContext, VectorElement } from "./Components/ContextDeLienzo";
+
+const CONSULTA_MOVIL_VERTICAL = "(max-width: 767px) and (orientation: portrait)";
 
 function App() {
   const [tamano, setTamano] = useState(16);
@@ -36,9 +38,111 @@ function App() {
   const [elementos, setElementos] = useState<VectorElement[]>([]);
   const [elementosGuardados, setElementosGuardados] = useState<VectorElement[]>([]);
   const [mostrarAdvertencia, setMostrarAdvertencia] = useState(false);
+  const [requiereOrientacionHorizontal, setRequiereOrientacionHorizontal] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(CONSULTA_MOVIL_VERTICAL).matches,
+  );
   const [accionPendiente, setAccionPendiente] = useState<(() => void) | null>(null);
   const accionPendienteRef = useRef<(() => void) | null>(null);
   accionPendienteRef.current = accionPendiente;
+
+  useEffect(() => {
+    const consulta = window.matchMedia(CONSULTA_MOVIL_VERTICAL);
+    const actualizarOrientacion = () => {
+      setRequiereOrientacionHorizontal(consulta.matches);
+    };
+
+    actualizarOrientacion();
+    consulta.addEventListener("change", actualizarOrientacion);
+    window.addEventListener("resize", actualizarOrientacion);
+    return () => {
+      consulta.removeEventListener("change", actualizarOrientacion);
+      window.removeEventListener("resize", actualizarOrientacion);
+    };
+  }, []);
+
+  const crearNuevoLienzo = useCallback(() => {
+    const hayCambiosNoGuardados =
+      elementos.length > 0 &&
+      JSON.stringify(elementos) !== JSON.stringify(elementosGuardados);
+    const iniciarLienzoNuevo = () => {
+      setMostrarPrompt(true);
+      setElementos([]);
+      setSelectedElementId(null);
+      setMultiSelectedIds([]);
+      setHerramientaActual("seleccionar");
+    };
+
+    if (hayCambiosNoGuardados) {
+      setAccionPendiente(() => iniciarLienzoNuevo);
+      setMostrarAdvertencia(true);
+    } else {
+      iniciarLienzoNuevo();
+    }
+  }, [elementos, elementosGuardados]);
+
+  const abrirGuardarLienzo = useCallback(() => {
+    setModoPrompt("guardar");
+    setMostrarPromptGuardarCargar(true);
+  }, []);
+
+  const abrirCargarLienzo = useCallback(() => {
+    const hayCambiosNoGuardados =
+      elementos.length > 0 &&
+      JSON.stringify(elementos) !== JSON.stringify(elementosGuardados);
+    const mostrarMenuCarga = () => {
+      setModoPrompt("cargar");
+      setMostrarPromptGuardarCargar(true);
+    };
+
+    if (hayCambiosNoGuardados) {
+      setAccionPendiente(() => mostrarMenuCarga);
+      setMostrarAdvertencia(true);
+    } else {
+      mostrarMenuCarga();
+    }
+  }, [elementos, elementosGuardados]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const esCampoEditable =
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest("input, textarea, select, [contenteditable='true']"));
+
+      if (
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        esCampoEditable ||
+        mostrarPrompt ||
+        mostrarPromptGuardarCargar ||
+        mostrarAdvertencia ||
+        requiereOrientacionHorizontal
+      ) {
+        return;
+      }
+
+      const tecla = event.key.toLowerCase();
+      if (!["n", "c", "g"].includes(tecla)) return;
+
+      event.preventDefault();
+      if (tecla === "n") crearNuevoLienzo();
+      if (tecla === "c") abrirCargarLienzo();
+      if (tecla === "g") abrirGuardarLienzo();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    mostrarPrompt,
+    mostrarPromptGuardarCargar,
+    mostrarAdvertencia,
+    requiereOrientacionHorizontal,
+    crearNuevoLienzo,
+    abrirCargarLienzo,
+    abrirGuardarLienzo,
+  ]);
 
   useEffect(() => {
     if (herramientaActual !== "seleccionar") {
@@ -123,7 +227,15 @@ function App() {
         setClipboardElements,
       }}
     >
-      <section className="w-full h-screen bg-gray-700 overflow-hidden">
+      <section
+        className="app-shell w-full h-screen bg-gray-700 overflow-hidden"
+        onKeyDownCapture={(event) => {
+          if (requiereOrientacionHorizontal) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+      >
         <Lienzo />
         <Toolbar />
         <PanelFiguras />
@@ -132,46 +244,9 @@ function App() {
         <BotonGrosor />
         {!mostrarPrompt && !mostrarPromptGuardarCargar && (
           <MenuHamburguesa
-            onNuevo={() => {
-              const hayCambiosNoGuardados =
-                elementos.length > 0 &&
-                JSON.stringify(elementos) !== JSON.stringify(elementosGuardados);
-              if (hayCambiosNoGuardados) {
-                setAccionPendiente(() => () => {
-                  setMostrarPrompt(true);
-                  setElementos([]);
-                  setSelectedElementId(null);
-                  setMultiSelectedIds([]);
-                  setHerramientaActual("seleccionar");
-                });
-                setMostrarAdvertencia(true);
-              } else {
-                setMostrarPrompt(true);
-                setElementos([]);
-                setSelectedElementId(null);
-                setMultiSelectedIds([]);
-                setHerramientaActual("seleccionar");
-              }
-            }}
-            onGuardar={() => {
-              setModoPrompt("guardar");
-              setMostrarPromptGuardarCargar(true);
-            }}
-            onCargar={() => {
-              const hayCambiosNoGuardados =
-                elementos.length > 0 &&
-                JSON.stringify(elementos) !== JSON.stringify(elementosGuardados);
-              if (hayCambiosNoGuardados) {
-                setAccionPendiente(() => () => {
-                  setModoPrompt("cargar");
-                  setMostrarPromptGuardarCargar(true);
-                });
-                setMostrarAdvertencia(true);
-              } else {
-                setModoPrompt("cargar");
-                setMostrarPromptGuardarCargar(true);
-              }
-            }}
+            onNuevo={crearNuevoLienzo}
+            onGuardar={abrirGuardarLienzo}
+            onCargar={abrirCargarLienzo}
           />
         )}
         <AnimacionMorphing mostrar={mostrarPrompt} lado="izquierda" />
@@ -228,6 +303,35 @@ function App() {
             accionPendienteRef.current = null;
           }}
         />
+        {requiereOrientacionHorizontal && (
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="orientacion-horizontal-titulo"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-950 p-6 text-center text-white"
+          >
+            <div className="flex max-w-sm flex-col items-center">
+              <svg
+                aria-hidden="true"
+                className="mb-5 h-16 w-16 text-sky-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <rect x="7" y="3" width="10" height="18" rx="2" strokeWidth="1.8" />
+                <path d="M10 6h4M11 18h2" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M3 9a8 8 0 0 1 2-3m16 9a8 8 0 0 1-2 3" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              <h1 id="orientacion-horizontal-titulo" className="mb-3 text-xl font-bold">
+                Gira tu celular
+              </h1>
+              <p className="text-base text-zinc-200">
+                Coloca el celular en orientación horizontal para usar mejor el editor.
+                Al girarlo, podrás continuar automáticamente.
+              </p>
+            </div>
+          </div>
+        )}
       </section>
     </LienzoContext.Provider>
   );

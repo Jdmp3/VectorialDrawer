@@ -35,7 +35,7 @@ function PanelFiguras() {
   const botonClase = (tipo: "linea" | "rectangulo" | "circulo" | "imagen") =>
     `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
       figuraTipo === tipo
-        ? "bg-blue-600 text-white"
+        ? "bg-sky-600 text-white"
         : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
     }`;
 
@@ -72,7 +72,7 @@ function PanelFiguras() {
   return (
     <>
       <div
-        className={`fixed right-40 top-4 bg-zinc-900 p-4 rounded-xl shadow-lg z-50 flex flex-col gap-3 transition-opacity duration-500 ${
+        className={`figures-panel fixed right-40 top-4 bg-zinc-900 p-4 rounded-xl shadow-lg z-50 flex flex-col gap-3 transition-opacity duration-500 ${
           visible ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -107,7 +107,7 @@ function PanelFiguras() {
             <button
               onClick={handleCargarClick}
               disabled={subiendoImagen}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 transition-colors"
             >
               {subiendoImagen ? "Subiendo…" : imagenCargada ? "Cambiar" : "Cargar"}
             </button>
@@ -142,7 +142,7 @@ function PanelFiguras() {
                 max="10"
                 value={grosorFigura}
                 onChange={(e) => setGrosorFigura(Number(e.target.value))}
-                className="w-32 cursor-pointer"
+                className="w-32 cursor-pointer accent-sky-600"
               />
               <span className="text-zinc-400 text-sm w-6">{grosorFigura}</span>
             </div>
@@ -151,6 +151,7 @@ function PanelFiguras() {
         {errorImagen && <p className="max-w-56 text-xs text-red-300">{errorImagen}</p>}
       </div>
       <div
+        className="figure-info-toast"
         style={{
           position: "fixed",
           top: "50%",

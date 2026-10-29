@@ -23,7 +23,7 @@ function PromptAdvertenciaCambios({
       )}
 
       <div
-        className={`fixed left-1/2 top-1/2 -translate-y-1/2 bg-red-500 text-white mx-auto w-full max-w-sm p-6 sm:p-8 rounded-[20px] border-red-800 border-6 transition-all duration-300 ease-in-out z-[71] ${
+        className={`unsaved-prompt fixed left-1/2 top-1/2 -translate-y-1/2 bg-red-500 text-white mx-auto w-full max-w-sm p-6 sm:p-8 rounded-[20px] border-red-800 border-6 transition-all duration-300 ease-in-out z-[71] ${
           mostrar
             ? "-translate-x-1/2 opacity-100"
             : "translate-x-[100vw] opacity-0"

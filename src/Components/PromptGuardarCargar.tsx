@@ -47,6 +47,7 @@ function PromptGuardarCargar({
   const [confirmandoBorrar, setConfirmandoBorrar] = useState(false);
   const [slots, setSlots] = useState<Array<DatosSlot | null>>(Array(9).fill(null));
   const [cargandoSlots, setCargandoSlots] = useState(true);
+  const [operacion, setOperacion] = useState<"guardando" | "borrando" | "cargando" | null>(null);
   const [errorBackend, setErrorBackend] = useState("");
   const [avisoMigracion, setAvisoMigracion] = useState(false);
   const [expansion, setExpansion] = useState<{
@@ -105,11 +106,13 @@ function PromptGuardarCargar({
   }, [mostrar]);
 
   const guardarSlot = async (index: number): Promise<boolean> => {
+    if (operacion) return false;
     const datos: DatosLienzo = {
       tamano,
       colorLienzo,
       elementos,
     };
+    setOperacion("guardando");
     try {
       const guardado = await guardarEnBackend(index, datos);
       setSlots((actuales) => actuales.map((slot, i) => (i === index ? guardado : slot)));
@@ -121,6 +124,8 @@ function PromptGuardarCargar({
         error instanceof Error ? error.message : "No se pudo guardar el lienzo."
       );
       return false;
+    } finally {
+      setOperacion(null);
     }
   };
 
@@ -143,11 +148,13 @@ function PromptGuardarCargar({
   };
 
   const handleBorrarClick = async () => {
+    if (operacion || cargandoSlots) return;
     if (slotSeleccionado === null) return;
     const datos = slots[slotSeleccionado];
     if (!datos) return;
 
     if (confirmandoBorrar) {
+      setOperacion("borrando");
       try {
         await borrarEspacio(slotSeleccionado);
         setSlots((actuales) => actuales.map((slot, i) => (i === slotSeleccionado ? null : slot)));
@@ -158,6 +165,8 @@ function PromptGuardarCargar({
         setErrorBackend(
           error instanceof Error ? error.message : "No se pudo borrar el lienzo."
         );
+      } finally {
+        setOperacion(null);
       }
     } else {
       setConfirmandoBorrar(true);
@@ -165,7 +174,7 @@ function PromptGuardarCargar({
   };
 
   const handleGuardarCargarClick = async () => {
-    if (slotSeleccionado === null || cargandoSlots) return;
+    if (slotSeleccionado === null || cargandoSlots || operacion) return;
     slotCursorRef.current = slotSeleccionado;
 
     if (modo === "guardar") {
@@ -184,6 +193,7 @@ function PromptGuardarCargar({
         svgEl?.getBoundingClientRect() ??
         new DOMRect(0, 0, window.innerWidth, window.innerHeight);
       iniciarExpansion(rect, targetRect, datos);
+      setOperacion("cargando");
       setMostrar(false);
     }
   };
@@ -440,7 +450,22 @@ function PromptGuardarCargar({
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3">
+        {(cargandoSlots || operacion) && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg bg-black/15 px-3 py-2 text-sm" role="status" aria-live="polite">
+            <span className="loading-spinner" aria-hidden="true" />
+            <span>
+              {cargandoSlots
+                ? "Consultando Go y la base de datos…"
+                : operacion === "guardando"
+                  ? "Guardando lienzo en la base de datos…"
+                  : operacion === "borrando"
+                    ? "Borrando lienzo…"
+                    : "Cargando lienzo…"}
+            </span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3" aria-busy={cargandoSlots || operacion !== null}>
           {Array.from({ length: 9 }, (_, i) => {
             const datos = slots[i];
             const ocupado = datos !== null;
@@ -524,7 +549,7 @@ function PromptGuardarCargar({
           <button
             onClick={handleGuardarCargarClick}
             data-primary-action
-                disabled={slotSeleccionado === null || cargandoSlots}
+            disabled={slotSeleccionado === null || cargandoSlots || operacion !== null}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-xs sm:text-sm transition-all duration-200 border-2 ${
               slotSeleccionado !== null
                 ? `${colores.btnBg} hover:brightness-110 text-white ${colores.btnBorder}`
@@ -560,11 +585,11 @@ function PromptGuardarCargar({
                 />
               </svg>
             )}
-            {modo === "guardar" ? "Guardar" : "Cargar"}
+            {operacion === "guardando" ? "Guardando…" : operacion === "cargando" ? "Cargando…" : modo === "guardar" ? "Guardar" : "Cargar"}
           </button>
           <button
             onClick={handleBorrarClick}
-            disabled={slotSeleccionado === null || !slots[slotSeleccionado] || cargandoSlots}
+            disabled={slotSeleccionado === null || !slots[slotSeleccionado] || cargandoSlots || operacion !== null}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-xs sm:text-sm transition-all duration-200 border-2 ${
               confirmandoBorrar
                 ? "bg-rose-400 text-white border-rose-200 shadow-lg shadow-rose-500/40"
@@ -610,6 +635,7 @@ function PromptGuardarCargar({
                 elementos: expansion.datos.elementos,
               });
               setExpansion(null);
+              setOperacion(null);
               setMostrar(false);
             }
           }}
@@ -626,6 +652,10 @@ function PromptGuardarCargar({
             className="w-full h-full object-contain"
             alt=""
           />
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 text-sm font-medium text-white" role="status">
+            <span className="loading-spinner mr-2" aria-hidden="true" />
+            Cargando lienzo…
+          </div>
         </div>
       )}
     </>

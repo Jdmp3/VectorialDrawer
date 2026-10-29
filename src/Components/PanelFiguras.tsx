@@ -18,6 +18,9 @@ function PanelFiguras() {
 
   const [visible, setVisible] = useState(false);
   const [subiendoImagen, setSubiendoImagen] = useState(false);
+  const [etapaSubida, setEtapaSubida] = useState<"solicitando-url" | "subiendo">("solicitando-url");
+  const [cargandoVistaPrevia, setCargandoVistaPrevia] = useState(false);
+  const [errorVistaPrevia, setErrorVistaPrevia] = useState(false);
   const [errorImagen, setErrorImagen] = useState("");
   const [infoVisible, setInfoVisible] = useState(false);
   const infoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,9 +60,13 @@ function PanelFiguras() {
     const file = e.target.files?.[0];
     if (!file) return;
     setSubiendoImagen(true);
+    setEtapaSubida("solicitando-url");
     setErrorImagen("");
+    setErrorVistaPrevia(false);
     try {
-      setImagenCargada(await subirImagen(file));
+      const imagen = await subirImagen(file, setEtapaSubida);
+      setCargandoVistaPrevia(true);
+      setImagenCargada(imagen);
       triggerInfo();
     } catch (error) {
       setErrorImagen(error instanceof Error ? error.message : "No se pudo subir la imagen.");
@@ -103,14 +110,21 @@ function PanelFiguras() {
           </button>
         </div>
         {figuraTipo === "imagen" ? (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
             <button
               onClick={handleCargarClick}
               disabled={subiendoImagen}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 transition-colors"
             >
-              {subiendoImagen ? "Subiendo…" : imagenCargada ? "Cambiar" : "Cargar"}
+              {subiendoImagen ? (etapaSubida === "solicitando-url" ? "Conectando…" : "Subiendo…") : imagenCargada ? "Cambiar" : "Cargar"}
             </button>
+              {subiendoImagen && (
+                <span className="flex items-center gap-2 text-xs text-zinc-300" role="status" aria-live="polite">
+                  <span className="loading-spinner" aria-hidden="true" />
+                  {etapaSubida === "solicitando-url" ? "Solicitando carga a Go…" : "Enviando imagen a S3…"}
+                </span>
+              )}
             <input
               ref={fileInputRef}
               type="file"
@@ -118,6 +132,24 @@ function PanelFiguras() {
               className="hidden"
               onChange={handleFileChange}
             />
+            </div>
+            {imagenCargada && (
+              <div className="relative h-24 w-full overflow-hidden rounded-lg bg-zinc-800" aria-busy={cargandoVistaPrevia}>
+                {cargandoVistaPrevia && <div className="image-skeleton absolute inset-0" aria-label="Cargando vista previa" />}
+                {errorVistaPrevia ? (
+                  <div className="flex h-full items-center justify-center text-xs text-zinc-300">Imagen no disponible</div>
+                ) : (
+                  <img
+                    key={imagenCargada.src}
+                    src={imagenCargada.src}
+                    alt="Vista previa de la imagen cargada"
+                    className={`h-full w-full object-contain transition-opacity ${cargandoVistaPrevia ? "opacity-0" : "opacity-100"}`}
+                    onLoad={() => setCargandoVistaPrevia(false)}
+                    onError={() => { setCargandoVistaPrevia(false); setErrorVistaPrevia(true); }}
+                  />
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <>

@@ -78,6 +78,7 @@ function Lienzo() {
   } | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [warningVisible, setWarningVisible] = useState(false);
+  const [estadosImagen, setEstadosImagen] = useState<Record<string, "cargando" | "lista" | "error">>({});
   const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerWarning = () => {
@@ -1103,6 +1104,9 @@ function Lienzo() {
                   </g>
                 );
               case "imagen":
+                {
+                const claveImagen = `${el.id}:${el.src}`;
+                const estadoImagen = estadosImagen[claveImagen] ?? "cargando";
                 return (
                   <g key={el.id} data-element-id={el.id}>
                     <g
@@ -1115,7 +1119,26 @@ function Lienzo() {
                         width={el.width}
                         height={el.height}
                         preserveAspectRatio="none"
+                        opacity={estadoImagen === "lista" ? 1 : 0}
+                        onLoad={() => setEstadosImagen((actual) => ({ ...actual, [claveImagen]: "lista" }))}
+                        onError={() => setEstadosImagen((actual) => ({ ...actual, [claveImagen]: "error" }))}
                       />
+                      {estadoImagen === "cargando" ? (
+                        <rect
+                          className="image-skeleton"
+                          x={el.x}
+                          y={el.y}
+                          width={el.width}
+                          height={el.height}
+                          pointerEvents="none"
+                          aria-label="Cargando imagen"
+                        />
+                      ) : estadoImagen === "error" ? (
+                        <g pointerEvents="none">
+                          <rect x={el.x} y={el.y} width={el.width} height={el.height} fill="#52525b" />
+                          <path d={`M ${el.x} ${el.y} L ${el.x + el.width} ${el.y + el.height} M ${el.x + el.width} ${el.y} L ${el.x} ${el.y + el.height}`} stroke="#d4d4d8" strokeWidth={Math.max(0.05, Math.min(el.width, el.height) * 0.04)} />
+                        </g>
+                      ) : null}
                       {sel && (
                         <rect
                           x={el.x - offsetSel}
@@ -1224,6 +1247,7 @@ function Lienzo() {
                     </g>
                   </g>
                 );
+                }
               case "circulo":
                 return (
                   <g key={el.id} data-element-id={el.id}>

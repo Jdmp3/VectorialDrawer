@@ -61,7 +61,7 @@ function PanelSeleccion() {
   };
 
   return (
-    <div className="fixed right-40 top-20 bg-zinc-900 p-4 rounded-xl shadow-lg z-50 flex flex-col gap-3">
+    <div className="selection-panel fixed right-40 top-20 bg-zinc-900 p-4 rounded-xl shadow-lg z-50 flex flex-col gap-3">
       <div className="flex gap-2">
         {haySeleccion && (
           <button

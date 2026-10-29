@@ -22,13 +22,13 @@ export default function BotonGrosor() {
 
   return (
     <div
-      className={`fixed z-40 left-0 top-[96%] -translate-y-1/2 flex flex-col items-center gap-2 p-4 bg-zinc-800 rounded-r-lg transition-opacity duration-500 ${
+      className={`thickness-panel fixed z-40 left-0 top-[96%] -translate-y-1/2 flex flex-col items-center gap-2 p-4 bg-zinc-800 rounded-r-lg transition-opacity duration-500 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
       <button
         onClick={handleToggle}
-        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
+        className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded transition-colors"
       >
         Toggle
       </button>

@@ -20,6 +20,7 @@ function Lienzo() {
     setOffsetReal,
     setOffsetRender,
     zoom,
+    setZoom,
     grosorBorde,
     colorLienzo,
     herramientaActual,
@@ -142,6 +143,36 @@ function Lienzo() {
 
   const clamp = (value: number, min: number, max: number) =>
     Math.max(min, Math.min(max, value));
+
+  const handleWheel = (event: React.WheelEvent<SVGSVGElement>) => {
+    if (herramientaActual !== "mover" || event.deltaY === 0) return;
+
+    event.preventDefault();
+    const siguienteZoom = clamp(zoom + (event.deltaY < 0 ? 0.1 : -0.1), 1, 8);
+    if (siguienteZoom === zoom) return;
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const proporcionX = clamp((event.clientX - bounds.left) / bounds.width, 0, 1);
+    const proporcionY = clamp((event.clientY - bounds.top) / bounds.height, 0, 1);
+    const siguienteViewBoxSize = tamano / siguienteZoom;
+    const siguienteMaxOffset = tamano - siguienteViewBoxSize;
+    const siguienteOffset = {
+      x: clamp(
+        centeredOffset.x + proporcionX * (viewBoxSize - siguienteViewBoxSize),
+        0,
+        siguienteMaxOffset,
+      ),
+      y: clamp(
+        centeredOffset.y + proporcionY * (viewBoxSize - siguienteViewBoxSize),
+        0,
+        siguienteMaxOffset,
+      ),
+    };
+
+    setZoom(siguienteZoom);
+    setOffsetReal(siguienteOffset);
+    setOffsetRender(siguienteOffset);
+  };
 
   const degToRad = (d: number) => (d * Math.PI) / 180;
 
@@ -861,14 +892,14 @@ function Lienzo() {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-zinc-800">
+    <div className="canvas-stage fixed inset-0 flex items-center justify-center bg-zinc-800">
       <svg
         ref={svgRef}
         data-lienzo-svg
         width={TAMANO_VISUAL}
         height={TAMANO_VISUAL}
         viewBox={`${centeredOffset.x} ${centeredOffset.y} ${viewBoxSize} ${viewBoxSize}`}
-        className={`shadow-2xl transition-opacity duration-500 ${
+        className={`canvas-svg shadow-2xl transition-opacity duration-500 ${
           mostrarPrompt ? "opacity-0" : "opacity-100"
         }`}
         style={{
@@ -880,6 +911,7 @@ function Lienzo() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
+        onWheel={handleWheel}
       >
         <defs>
           <clipPath id="lienzoClip">

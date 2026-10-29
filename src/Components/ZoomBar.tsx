@@ -16,7 +16,7 @@ export default function ZoomBar() {
 
   return (
     <div
-      className={`fixed z-40 left-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-4 p-4 bg-zinc-800 rounded-r-lg transition-opacity duration-500 ${
+      className={`zoom-panel fixed z-40 left-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-4 p-4 bg-zinc-800 rounded-r-lg transition-opacity duration-500 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
@@ -29,12 +29,12 @@ export default function ZoomBar() {
         step="0.1"
         value={zoom}
         onChange={handleZoomChange}
-        className="writing-vertical writing-rl"
+        className="zoom-slider writing-vertical writing-rl"
         style={{
           writingMode: "vertical-lr",
           direction: "rtl",
           height: "200px",
-          accentColor: "#3b82f6"
+          accentColor: "#0284c7"
         }}
       />
       

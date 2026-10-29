@@ -25,7 +25,7 @@ function Toolbar() {
 
   return (
     <div
-      className={`fixed right-4 top-4 flex flex-col gap-2 bg-zinc-900 p-3 rounded-xl shadow-lg z-50 transition-opacity duration-500 ${
+      className={`toolbar-panel fixed right-4 top-4 flex flex-col gap-2 bg-zinc-900 p-3 rounded-xl shadow-lg z-50 transition-opacity duration-500 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
@@ -33,17 +33,17 @@ function Toolbar() {
         onClick={handleMoverClick}
         className={`px-4 py-2 rounded-lg font-medium transition-colors ${
           herramientaActual === "mover"
-            ? "bg-blue-600 text-white"
+            ? "bg-sky-600 text-white"
             : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
         }`}
       >
-        Mover
+        Desplazar
       </button>
       <button
         onClick={() => setHerramientaActual("seleccionar")}
         className={`px-4 py-2 rounded-lg font-medium transition-colors ${
           herramientaActual === "seleccionar"
-            ? "bg-blue-600 text-white"
+            ? "bg-sky-600 text-white"
             : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
         }`}
       >
@@ -53,7 +53,7 @@ function Toolbar() {
         onClick={handleFigurasClick}
         className={`px-4 py-2 rounded-lg font-medium transition-colors ${
           herramientaActual === "figuras"
-            ? "bg-blue-600 text-white"
+            ? "bg-sky-600 text-white"
             : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
         }`}
       >

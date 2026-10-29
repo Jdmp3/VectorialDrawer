@@ -35,7 +35,7 @@ function MenuHamburguesa({ onNuevo, onGuardar, onCargar }: Propiedades) {
 
       <button
         onClick={() => setAbierto(!abierto)}
-        className="fixed top-4 left-4 z-[70] w-10 h-10 flex items-center justify-center bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+        className="hamburger-trigger fixed top-4 left-4 z-[70] w-10 h-10 flex items-center justify-center bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors"
       >
         {abierto ? (
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -49,7 +49,7 @@ function MenuHamburguesa({ onNuevo, onGuardar, onCargar }: Propiedades) {
       </button>
 
       <div
-        className={`fixed top-0 left-0 h-full w-64 bg-gray-800 z-60 transform transition-transform duration-300 ease-in-out ${
+        className={`hamburger-drawer fixed top-0 left-0 h-full w-64 bg-gray-800 z-60 transform transition-transform duration-300 ease-in-out ${
           abierto ? "translate-x-0" : "-translate-x-full"
         }`}
       >

@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -96,13 +97,47 @@ func main() {
 }
 
 func crearTabla(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, `
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS lienzo (
-			espacio SMALLINT PRIMARY KEY CHECK (espacio BETWEEN 0 AND 8),
+			espacio INTEGER PRIMARY KEY,
 			datos JSONB NOT NULL,
 			guardado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
-		)`)
-	return err
+		)`); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE lienzo ALTER COLUMN espacio TYPE INTEGER`); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE lienzo DROP CONSTRAINT IF EXISTS lienzo_espacio_check`); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `LOCK TABLE lienzo IN EXCLUSIVE MODE`); err != nil {
+		return err
+	}
+	var offset int
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(espacio), -1) + COUNT(*) + 1 FROM lienzo`).Scan(&offset); err != nil {
+		return err
+	}
+	if offset > 0 {
+		if _, err := tx.ExecContext(ctx, `UPDATE lienzo SET espacio = espacio + $1`, offset); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			WITH numerados AS (
+				SELECT espacio, ROW_NUMBER() OVER (ORDER BY espacio) - 1 AS nuevo
+				FROM lienzo
+			)
+			UPDATE lienzo AS l SET espacio = n.nuevo
+			FROM numerados AS n WHERE l.espacio = n.espacio`); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *server) health(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +149,7 @@ func (s *server) health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) listarEspacios(w http.ResponseWriter, r *http.Request) {
-	registros := make([]*slotRecord, 9)
+	registros := make([]*slotRecord, 0)
 	rows, err := s.db.QueryContext(r.Context(), `
 		SELECT espacio, datos, guardado_en FROM lienzo ORDER BY espacio`)
 	if err != nil {
@@ -136,14 +171,15 @@ func (s *server) listarEspacios(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "Hay datos de lienzo inválidos en PostgreSQL")
 			return
 		}
-		registros[espacio] = &slotRecord{
+		registro := &slotRecord{
 			Espacio: espacio, Tamano: datos.Tamano, ColorLienzo: datos.ColorLienzo,
 			Elementos: datos.Elementos, GuardadoEn: guardadoEn,
 		}
-		if err := s.firmarImagenes(r.Context(), registros[espacio]); err != nil {
+		if err := s.firmarImagenes(r.Context(), registro); err != nil {
 			writeError(w, http.StatusInternalServerError, "No se pudieron preparar las imágenes del lienzo")
 			return
 		}
+		registros = append(registros, registro)
 	}
 	if err := rows.Err(); err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudieron leer los espacios")
@@ -274,6 +310,10 @@ func (s *server) borrarEspacio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(r.Context(), `LOCK TABLE lienzo IN EXCLUSIVE MODE`); err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo bloquear la lista de lienzos")
+		return
+	}
 	keys, err := leerClavesEspacioTx(r.Context(), tx, espacio)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudieron identificar las imágenes del lienzo")
@@ -282,6 +322,22 @@ func (s *server) borrarEspacio(w http.ResponseWriter, r *http.Request) {
 	if _, err := tx.ExecContext(r.Context(), `DELETE FROM lienzo WHERE espacio = $1`, espacio); err != nil {
 		writeError(w, http.StatusInternalServerError, "No se pudo borrar el lienzo")
 		return
+	}
+	var maxEspacio sql.NullInt64
+	if err := tx.QueryRowContext(r.Context(), `SELECT MAX(espacio) FROM lienzo`).Scan(&maxEspacio); err != nil {
+		writeError(w, http.StatusInternalServerError, "No se pudo reorganizar la lista de lienzos")
+		return
+	}
+	if maxEspacio.Valid && maxEspacio.Int64 > int64(espacio) {
+		offset := maxEspacio.Int64 + 1
+		if _, err := tx.ExecContext(r.Context(), `UPDATE lienzo SET espacio = espacio + $1 WHERE espacio > $2`, offset, espacio); err != nil {
+			writeError(w, http.StatusInternalServerError, "No se pudo reorganizar la lista de lienzos")
+			return
+		}
+		if _, err := tx.ExecContext(r.Context(), `UPDATE lienzo SET espacio = espacio - $1 WHERE espacio > $2`, offset+1, offset+int64(espacio)); err != nil {
+			writeError(w, http.StatusInternalServerError, "No se pudo reorganizar la lista de lienzos")
+			return
+		}
 	}
 	for _, key := range keys {
 		if _, err := tx.ExecContext(r.Context(), `INSERT INTO s3_cleanup (object_key) VALUES ($1) ON CONFLICT DO NOTHING`, key); err != nil {
@@ -303,13 +359,13 @@ func (s *server) migrarEspacios(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "El cuerpo de la solicitud no contiene JSON válido")
 		return
 	}
-	if len(entradas) == 0 || len(entradas) > 9 {
-		writeError(w, http.StatusBadRequest, "La migración debe incluir entre 1 y 9 lienzos")
+	if len(entradas) == 0 {
+		writeError(w, http.StatusBadRequest, "La migración debe incluir al menos un lienzo")
 		return
 	}
 	vistos := make(map[int]bool, len(entradas))
 	for _, entrada := range entradas {
-		if entrada.Espacio < 0 || entrada.Espacio > 8 || vistos[entrada.Espacio] {
+		if entrada.Espacio < 0 || vistos[entrada.Espacio] {
 			writeError(w, http.StatusBadRequest, "La migración contiene espacios inválidos o repetidos")
 			return
 		}
@@ -323,6 +379,9 @@ func (s *server) migrarEspacios(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	sort.Slice(entradas, func(i, j int) bool {
+		return entradas[i].Espacio < entradas[j].Espacio
+	})
 	var migradas []string
 	for i := range entradas {
 		created, err := s.prepararImagenes(r.Context(), entradas[i].Espacio, &entradas[i].Datos)
@@ -360,7 +419,7 @@ func (s *server) migrarEspacios(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, entrada := range entradas {
+	for espacio, entrada := range entradas {
 		raw, err := json.Marshal(entrada.Datos)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "No se pudieron procesar los datos de la migración")
@@ -368,7 +427,7 @@ func (s *server) migrarEspacios(w http.ResponseWriter, r *http.Request) {
 		}
 		if _, err := tx.ExecContext(r.Context(), `
 			INSERT INTO lienzo (espacio, datos, guardado_en)
-			VALUES ($1, $2::jsonb, $3)`, entrada.Espacio, string(raw), entrada.GuardadoEn); err != nil {
+			VALUES ($1, $2::jsonb, $3)`, espacio, string(raw), entrada.GuardadoEn); err != nil {
 			writeError(w, http.StatusInternalServerError, "Falló la migración; no se guardaron cambios parciales")
 			return
 		}
@@ -410,8 +469,8 @@ func validarLienzo(datos canvasData) error {
 
 func leerIndice(w http.ResponseWriter, r *http.Request) (int, bool) {
 	espacio, err := strconv.Atoi(r.PathValue("espacio"))
-	if err != nil || espacio < 0 || espacio > 8 {
-		writeError(w, http.StatusBadRequest, "El número de espacio debe estar entre 0 y 8")
+	if err != nil || espacio < 0 {
+		writeError(w, http.StatusBadRequest, "El número de espacio no es válido")
 		return 0, false
 	}
 	return espacio, true

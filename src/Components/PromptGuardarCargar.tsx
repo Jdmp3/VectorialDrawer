@@ -48,10 +48,9 @@ function PromptGuardarCargar({
   const { tamano, colorLienzo, elementos } = useContext(LienzoContext);
   const [slotSeleccionado, setSlotSeleccionado] = useState<number | null>(null);
   const slotCursorRef = useRef<number | null>(null);
-  const modalidadEntradaRef = useRef<"mouse" | "teclado" | null>(null);
   const slotAntesDeCerrarRef = useRef<number | null>(null);
   const [confirmandoBorrar, setConfirmandoBorrar] = useState(false);
-  const [slots, setSlots] = useState<Array<DatosSlot | null>>(Array(9).fill(null));
+  const [slots, setSlots] = useState<Array<DatosSlot | null>>([]);
   const [cargandoSlots, setCargandoSlots] = useState(true);
   const [operacion, setOperacion] = useState<"guardando" | "borrando" | "cargando" | null>(null);
   const [errorBackend, setErrorBackend] = useState("");
@@ -106,7 +105,6 @@ function PromptGuardarCargar({
     if (!mostrar) {
       setSlotSeleccionado(null);
       setConfirmandoBorrar(false);
-      modalidadEntradaRef.current = null;
       slotAntesDeCerrarRef.current = null;
     }
   }, [mostrar]);
@@ -121,7 +119,11 @@ function PromptGuardarCargar({
     setOperacion("guardando");
     try {
       const guardado = await guardarEnBackend(index, datos);
-      setSlots((actuales) => actuales.map((slot, i) => (i === index ? guardado : slot)));
+      setSlots((actuales) => {
+        const nuevos = [...actuales];
+        nuevos[index] = guardado;
+        return nuevos;
+      });
       setErrorBackend("");
       onSaveSlot?.(guardado.elementos);
       return true;
@@ -147,7 +149,6 @@ function PromptGuardarCargar({
   };
 
   const handleSlotClick = (_e: React.MouseEvent, index: number) => {
-    modalidadEntradaRef.current = "mouse";
     slotCursorRef.current = index;
     setSlotSeleccionado(modo === "cargar" && !slots[index] ? null : index);
     setConfirmandoBorrar(false);
@@ -163,10 +164,26 @@ function PromptGuardarCargar({
       setOperacion("borrando");
       try {
         await borrarEspacio(slotSeleccionado);
-        setSlots((actuales) => actuales.map((slot, i) => (i === slotSeleccionado ? null : slot)));
-        setSlotSeleccionado(null);
+        const siguientesSlots = slots
+          .filter((slot, i) => i !== slotSeleccionado && slot !== null)
+          .map((slot, espacio) => slot ? { ...slot, espacio } : null);
+        const siguienteSeleccionado = modo === "guardar"
+          ? slotSeleccionado
+          : siguientesSlots.length > 0
+            ? Math.min(slotSeleccionado, siguientesSlots.length - 1)
+            : null;
+        setSlots(siguientesSlots);
+        setSlotSeleccionado(siguienteSeleccionado);
+        slotCursorRef.current = siguienteSeleccionado;
         setConfirmandoBorrar(false);
         setErrorBackend("");
+        if (siguienteSeleccionado !== null) {
+          requestAnimationFrame(() => {
+            const objetivo = document.querySelector<HTMLButtonElement>(`[data-slot-index="${siguienteSeleccionado}"]`);
+            objetivo?.focus({ preventScroll: true });
+            objetivo?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          });
+        }
       } catch (error) {
         setErrorBackend(
           mensajeError(error, "No se pudo borrar el lienzo.")
@@ -184,7 +201,10 @@ function PromptGuardarCargar({
     slotCursorRef.current = slotSeleccionado;
 
     if (modo === "guardar") {
-      await guardarSlot(slotSeleccionado);
+      const guardado = await guardarSlot(slotSeleccionado);
+      if (guardado) {
+        setConfirmandoBorrar(false);
+      }
     } else {
       const datos = slots[slotSeleccionado];
       if (!datos) return;
@@ -215,6 +235,13 @@ function PromptGuardarCargar({
           (elemento.isContentEditable ||
             elemento.closest("input, textarea, select, [contenteditable='true']"))
       );
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMostrar(false);
+        setSlotSeleccionado(null);
+        setConfirmandoBorrar(false);
+        return;
+      }
       if (esCampoEditable) return;
 
       if (event.key === "Backspace") {
@@ -233,7 +260,6 @@ function PromptGuardarCargar({
             slotCursorRef.current = index;
             void guardarSlot(index).then((guardado) => {
               if (guardado) {
-                setSlotSeleccionado(null);
                 setConfirmandoBorrar(false);
               }
             });
@@ -249,9 +275,11 @@ function PromptGuardarCargar({
       }
 
       event.preventDefault();
-      const modalidadAnterior = modalidadEntradaRef.current;
-      modalidadEntradaRef.current = "teclado";
-      const disponible = (index: number) => modo === "guardar" || slots[index] !== null;
+      const cantidadAccesible = slots.length + (modo === "guardar" ? 1 : 0);
+      const cantidadPosiciones = Math.max(9, cantidadAccesible);
+      const disponible = (index: number) =>
+        index < slots.length ? slots[index] !== null : modo === "guardar" && index === slots.length;
+      const slotBase = slotSeleccionado ?? slotCursorRef.current;
       let siguiente: number | null = null;
 
       const botonCerrar = elemento?.closest("[data-close-button]");
@@ -275,9 +303,9 @@ function PromptGuardarCargar({
           slotCursorRef.current = siguiente;
           setConfirmandoBorrar(false);
           requestAnimationFrame(() => {
-            document
-              .querySelector<HTMLButtonElement>(`[data-slot-index="${siguiente}"]`)
-              ?.focus();
+            const objetivo = document.querySelector<HTMLButtonElement>(`[data-slot-index="${siguiente}"]`);
+            objetivo?.focus({ preventScroll: true });
+            objetivo?.scrollIntoView({ behavior: "smooth", block: "nearest" });
           });
         }
         return;
@@ -285,9 +313,11 @@ function PromptGuardarCargar({
 
       if (
         event.key === "ArrowUp" &&
-        (slotSeleccionado === null || slotSeleccionado < 3)
+        slotBase !== null &&
+        slotBase >= 0 &&
+        slotBase < 3
       ) {
-        slotAntesDeCerrarRef.current = slotSeleccionado ?? slotCursorRef.current;
+        slotAntesDeCerrarRef.current = slotBase;
         setSlotSeleccionado(null);
         setConfirmandoBorrar(false);
         requestAnimationFrame(() => {
@@ -296,10 +326,10 @@ function PromptGuardarCargar({
         return;
       }
 
-      const slotBase = slotSeleccionado ?? slotCursorRef.current;
       if (slotBase === null) {
-        const primeroDisponible = slots.findIndex((_, index) => disponible(index));
-        if (primeroDisponible >= 0) siguiente = primeroDisponible;
+        const primeroDisponible = Array.from({ length: cantidadAccesible }, (_, index) => index)
+          .find(disponible);
+        if (primeroDisponible !== undefined) siguiente = primeroDisponible;
       } else {
         let fila = Math.floor(slotBase / 3);
         let columna = slotBase % 3;
@@ -315,8 +345,9 @@ function PromptGuardarCargar({
         while (true) {
           fila += deltaFila;
           columna += deltaColumna;
-          if (fila < 0 || fila >= 3 || columna < 0 || columna >= 3) break;
+          if (fila < 0 || fila >= Math.ceil(cantidadPosiciones / 3) || columna < 0 || columna >= 3) break;
           const candidato = fila * 3 + columna;
+          if (candidato >= cantidadPosiciones) break;
           if (disponible(candidato)) {
             siguiente = candidato;
             break;
@@ -329,13 +360,10 @@ function PromptGuardarCargar({
         slotCursorRef.current = siguiente;
         setConfirmandoBorrar(false);
         requestAnimationFrame(() => {
-          document
-            .querySelector<HTMLButtonElement>(`[data-slot-index="${siguiente}"]`)
-            ?.focus();
+          const objetivo = document.querySelector<HTMLButtonElement>(`[data-slot-index="${siguiente}"]`);
+          objetivo?.focus({ preventScroll: true });
+          objetivo?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         });
-      } else if (modalidadAnterior !== "teclado") {
-        setSlotSeleccionado(null);
-        setConfirmandoBorrar(false);
       }
     };
 
@@ -397,7 +425,7 @@ function PromptGuardarCargar({
       )}
 
       <div
-        className={`save-load-prompt fixed left-1/2 -translate-x-1/2 mx-auto w-full max-w-md ${colores.bg} ${colores.text} p-6 sm:p-8 rounded-[20px] ${colores.border} border-6 transition-all ease-in-out z-[56] ${
+        className={`save-load-prompt fixed left-1/2 -translate-x-1/2 mx-auto w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden ${colores.bg} ${colores.text} p-6 sm:p-8 rounded-[20px] ${colores.border} border-6 transition-all ease-in-out z-[56] ${
           mostrar
             ? "top-1/2 -translate-y-1/2 duration-[300ms]"
             : "top-1/2 translate-y-[-200vh] duration-[300ms]"
@@ -465,81 +493,48 @@ function PromptGuardarCargar({
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3" aria-busy={cargandoSlots || operacion !== null}>
-          {Array.from({ length: 9 }, (_, i) => {
-            const datos = slots[i];
+        <div
+          className={`save-load-slots grid grid-cols-3 gap-1.5 sm:gap-2 mb-3 p-2 max-h-[60dvh] ${slots.length + (modo === "guardar" ? 1 : 0) > 9 ? "overflow-y-scroll" : "overflow-y-hidden"} overscroll-contain`}
+          aria-busy={cargandoSlots || operacion !== null}
+          aria-label={modo === "guardar" ? "Lienzos guardados y espacio nuevo" : "Lienzos guardados"}
+        >
+          {Array.from({ length: Math.max(9, slots.length + (modo === "guardar" ? 1 : 0)) }, (_, i) => {
+            const datos = slots[i] ?? null;
             const ocupado = datos !== null;
+            const espacioNuevo = modo === "guardar" && i === slots.length;
+
+            if (!ocupado && !espacioNuevo) {
+              return <div key={`vacio-${i}`} className="canvas-slot-empty aspect-square rounded-lg bg-zinc-950/70 border border-zinc-700/70" aria-hidden="true" />;
+            }
 
             return (
               <button
                 key={i}
+                type="button"
                 onClick={(e) => handleSlotClick(e, i)}
                 data-slot-index={i}
                 aria-pressed={slotSeleccionado === i}
-                className={`relative rounded-lg overflow-hidden transition-all duration-200 ease-in-out 
-                    ${colores.slotBg} ${colores.slotHover}
-                    ${
-                      modo === "cargar" && !ocupado ? "opacity-50" : ""
-                    }
-                    ${
-                      modo === "cargar" && !ocupado
-                        ? "cursor-not-allowed"
-                        : "cursor-pointer"
-                    }
-                    ${
-                      slotSeleccionado === i
-                        ? `${colores.slotSelected} ring-2 ring-white/80 scale-[1.04] shadow-lg shadow-black/30`
-                        : ""
-                    }
-                    p-1.5 flex flex-col items-center
-                  `}
+                className={`relative rounded-lg overflow-hidden transition-all duration-200 ease-in-out ${colores.slotBg} ${colores.slotHover} ${slotSeleccionado === i ? `${colores.slotSelected} ring-2 ring-white/80 scale-[1.04] shadow-lg shadow-black/30` : ""} p-1.5 flex flex-col items-center cursor-pointer`}
               >
-                <div className="canvas-slot-preview w-full aspect-square rounded overflow-hidden mb-0.5 bg-black/20">
+                <div className={`canvas-slot-preview w-full aspect-square rounded overflow-hidden mb-0.5 ${ocupado ? "bg-black/20" : "bg-black/25"}`}>
                   {ocupado ? (
                     <img
-                      src={miniaturaToDataURL(
-                        generarSVGMiniatura(
-                          datos.tamano,
-                          datos.colorLienzo,
-                          datos.elementos,
-                          80
-                        )
-                      )}
+                      src={miniaturaToDataURL(generarSVGMiniatura(datos.tamano, datos.colorLienzo, datos.elementos, 80))}
                       alt=""
                       className="w-full h-full object-contain"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <svg
-                        className={`w-4 h-4 sm:w-5 sm:h-5 ${colores.slotMuted}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M12 4v16m8-8H4"
-                        />
+                      <svg className={`w-4 h-4 sm:w-5 sm:h-5 ${colores.slotMuted}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                       </svg>
                     </div>
                   )}
                 </div>
-                <span
-                  className={`text-[10px] sm:text-xs font-medium ${colores.slotText} leading-tight`}
-                >
-                  {ocupado
-                    ? `${datos.tamano}x${datos.tamano}`
-                    : "Vacío"}
+                <span className={`text-[10px] sm:text-xs font-medium ${colores.slotText} leading-tight`}>
+                  {ocupado ? `${datos.tamano}x${datos.tamano}` : "Guardar nuevo"}
                 </span>
-                {ocupado && (
-                  <span
-                    className={`text-[8px] sm:text-[10px] ${colores.slotMuted} leading-tight`}
-                  >
-                    {formatearFecha(datos.guardadoEn)}
-                  </span>
-                )}
+                {ocupado && <span className={`text-[8px] sm:text-[10px] ${colores.slotMuted} leading-tight`}>{formatearFecha(datos.guardadoEn)}</span>}
               </button>
             );
           })}

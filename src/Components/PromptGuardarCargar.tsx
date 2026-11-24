@@ -538,6 +538,9 @@ function PromptGuardarCargar({
               </button>
             );
           })}
+          {modo === "cargar" && slots.length === 0 && !cargandoSlots && !errorBackend && (
+            <p className="save-load-empty-state" role="status">Aún no hay lienzos guardados.</p>
+          )}
         </div>
 
         <div className="flex justify-end gap-2">

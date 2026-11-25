@@ -106,6 +106,16 @@ function Lienzo() {
     initialPositions: VectorElement[];
   } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const activePointersRef = useRef(new Map<number, { x: number; y: number; type: string }>());
+  const interactionPointerIdRef = useRef<number | null>(null);
+  const pinchStartRef = useRef<{
+    pointerIds: [number, number];
+    distance: number;
+    zoom: number;
+    anchorX: number;
+    anchorY: number;
+    currentOffset: { x: number; y: number };
+  } | null>(null);
 
   useEffect(() => {
     const viewBoxSize = tamano / zoom;
@@ -121,6 +131,16 @@ function Lienzo() {
     let animacionId: number;
 
     const animate = () => {
+      const deltaX = offsetReal.x - offsetRender.x;
+      const deltaY = offsetReal.y - offsetRender.y;
+
+      if (Math.abs(deltaX) < 0.01 && Math.abs(deltaY) < 0.01) {
+        if (offsetRender.x !== offsetReal.x || offsetRender.y !== offsetReal.y) {
+          setOffsetRender({ x: offsetReal.x, y: offsetReal.y });
+        }
+        return;
+      }
+
       const newX = lerp(offsetRender.x, offsetReal.x, FACTOR_LERP);
       const newY = lerp(offsetRender.y, offsetReal.y, FACTOR_LERP);
       setOffsetRender({ x: newX, y: newY });
@@ -263,7 +283,7 @@ function Lienzo() {
     }
   };
 
-  const getMousePosition = (e: React.MouseEvent): { x: number; y: number } => {
+  const getMousePosition = (e: React.PointerEvent<SVGSVGElement>): { x: number; y: number } => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -278,7 +298,43 @@ function Lienzo() {
     return { x: posX, y: posY };
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const pointerDistance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot(a.x - b.x, a.y - b.y);
+
+  const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    activePointersRef.current.set(e.pointerId, {
+      x: e.clientX,
+      y: e.clientY,
+      type: e.pointerType,
+    });
+
+    const activeTouches = Array.from(activePointersRef.current.entries())
+      .filter(([, pointer]) => pointer.type === "touch");
+    if (herramientaActual === "mover" && activeTouches.length >= 2 && svgRef.current) {
+      const [first, second] = activeTouches.slice(-2);
+      const firstPoint = first[1];
+      const secondPoint = second[1];
+      const rect = svgRef.current.getBoundingClientRect();
+      const midpointX = (firstPoint.x + secondPoint.x) / 2;
+      const midpointY = (firstPoint.y + secondPoint.y) / 2;
+      const ratioX = clamp((midpointX - rect.left) / rect.width, 0, 1);
+      const ratioY = clamp((midpointY - rect.top) / rect.height, 0, 1);
+      pinchStartRef.current = {
+        pointerIds: [first[0], second[0]],
+        distance: pointerDistance(firstPoint, secondPoint),
+        zoom,
+        anchorX: centeredOffset.x + ratioX * viewBoxSize,
+        anchorY: centeredOffset.y + ratioY * viewBoxSize,
+        currentOffset: { ...offsetReal },
+      };
+      interactionPointerIdRef.current = null;
+      setIsDragging(false);
+      return;
+    }
+
+    if (interactionPointerIdRef.current !== null) return;
+    interactionPointerIdRef.current = e.pointerId;
     if (isZoomedOut) return;
 
     if (herramientaActual === "mover") {
@@ -546,7 +602,39 @@ function Lienzo() {
     };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const pointer = activePointersRef.current.get(e.pointerId);
+    if (pointer) {
+      pointer.x = e.clientX;
+      pointer.y = e.clientY;
+    }
+
+    const pinch = pinchStartRef.current;
+    if (pinch && pinch.pointerIds.includes(e.pointerId) && svgRef.current) {
+      const first = activePointersRef.current.get(pinch.pointerIds[0]);
+      const second = activePointersRef.current.get(pinch.pointerIds[1]);
+      if (!first || !second) return;
+
+      const rect = svgRef.current.getBoundingClientRect();
+      const distance = Math.max(1, pointerDistance(first, second));
+      const nextZoom = clamp(pinch.zoom * (distance / Math.max(1, pinch.distance)), 1, 8);
+      const midpointX = (first.x + second.x) / 2;
+      const midpointY = (first.y + second.y) / 2;
+      const ratioX = clamp((midpointX - rect.left) / rect.width, 0, 1);
+      const ratioY = clamp((midpointY - rect.top) / rect.height, 0, 1);
+      const nextViewBoxSize = tamano / nextZoom;
+      const nextOffset = {
+        x: clamp(pinch.anchorX - ratioX * nextViewBoxSize, 0, tamano - nextViewBoxSize),
+        y: clamp(pinch.anchorY - ratioY * nextViewBoxSize, 0, tamano - nextViewBoxSize),
+      };
+      pinch.currentOffset = nextOffset;
+      setZoom(nextZoom);
+      setOffsetReal(nextOffset);
+      setOffsetRender(nextOffset);
+      return;
+    }
+
+    if (pinchStartRef.current || interactionPointerIdRef.current !== e.pointerId) return;
     if (
       isResizing &&
       resizeStart &&
@@ -815,7 +903,30 @@ function Lienzo() {
     setResizeStart(null);
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+    activePointersRef.current.delete(e.pointerId);
+    if (pinchStartRef.current?.pointerIds.includes(e.pointerId)) {
+      const pinch = pinchStartRef.current;
+      pinchStartRef.current = null;
+      const remaining = Array.from(activePointersRef.current.entries())
+        .find(([, pointer]) => pointer.type === "touch");
+      if (remaining && herramientaActual === "mover") {
+        interactionPointerIdRef.current = remaining[0];
+        setDragStart({
+          x: remaining[1].x,
+          y: remaining[1].y,
+          offsetX: pinch.currentOffset.x,
+          offsetY: pinch.currentOffset.y,
+        });
+        setIsDragging(true);
+      } else {
+        interactionPointerIdRef.current = null;
+        setIsDragging(false);
+      }
+      return;
+    }
+    if (interactionPointerIdRef.current !== e.pointerId) return;
+    interactionPointerIdRef.current = null;
     if (isRotating) {
       setIsRotating(false);
       setRotateStart(null);
@@ -843,26 +954,6 @@ function Lienzo() {
       }
       setMultiSelectedIds(ids);
       if (ids.length === 0) setSelectedElementId(null);
-      setIsBoxSelecting(false);
-      setBoxSelectStart(null);
-      setBoxSelectRect(null);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (isRotating) {
-      setIsRotating(false);
-      setRotateStart(null);
-    }
-    if (isResizing) endResize();
-    if (isDragging) setIsDragging(false);
-    if (isDrawing) finalizeDrawing();
-    if (isDraggingElement) setIsDraggingElement(false);
-    if (isMultiDragging) {
-      setIsMultiDragging(false);
-      setMultiDragStart(null);
-    }
-    if (isBoxSelecting) {
       setIsBoxSelecting(false);
       setBoxSelectStart(null);
       setBoxSelectRect(null);
@@ -908,10 +999,10 @@ function Lienzo() {
           aspectRatio: "1 / 1",
           cursor: getCursor(),
         }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onWheel={handleWheel}
       >
         <defs>

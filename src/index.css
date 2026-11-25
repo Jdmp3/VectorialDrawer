@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+.canvas-svg {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .loading-spinner {
   display: inline-block;
   width: 1rem;
@@ -97,7 +103,8 @@
   }
 }
 
-@media (orientation: landscape) and (max-height: 500px) {
+@media (orientation: landscape) and (max-height: 500px),
+  (max-width: 767px) and (orientation: landscape) {
   .app-shell {
     height: 100dvh;
     min-height: 0;
@@ -306,7 +313,10 @@
     max-height: calc(100dvh - 1rem);
     padding: 1rem;
   }
+}
 
+@media (max-width: 767px),
+  (orientation: landscape) and (max-height: 500px) {
   .save-load-slots {
     display: flex;
     flex: 0 0 auto;
@@ -362,7 +372,8 @@
   }
 }
 
-@media (max-width: 767px) and (orientation: landscape) {
+@media (max-width: 767px) and (orientation: landscape),
+  (orientation: landscape) and (max-height: 500px) {
   .save-load-slots {
     max-height: 43dvh;
   }
